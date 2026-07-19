@@ -135,6 +135,22 @@ export const useHousekeepingTasks = () => {
 		}
 	}, [fetchTasks, fetchTodayTasks, fetchTaskCounts]);
 
+	const updateChecklistStep = useCallback(async (taskId, stepIndex, checked) => {
+		setActionLoading(true);
+		try {
+			const response = await housekeepingApi.updateChecklistStep(taskId, stepIndex, checked);
+			const updatedTask = response.data.data;
+			setTasks((current) => current.map((task) => task.id === updatedTask.id ? updatedTask : task));
+			return {success: true, data: updatedTask};
+		} catch (error) {
+			const message = error.response?.data?.message || 'Failed to update checklist';
+			notifications.show({title: 'Error', message, color: 'red'});
+			return {success: false, error: message};
+		} finally {
+			setActionLoading(false);
+		}
+	}, []);
+
 	// ==================== MINIBAR FUNCTIONS ====================
 	const fetchMinibarItems = useCallback(async (roomId) => {
 		try {
@@ -370,6 +386,7 @@ export const useHousekeepingTasks = () => {
 		fetchTaskCounts,
 		startTask,
 		completeTask,
+		updateChecklistStep,
 
 		// Minibar
 		minibarItems,

@@ -109,6 +109,15 @@ export const CheckInPage = () => {
     };
 
     const handleCheckIn = async () => {
+        const scheduledCheckIn = reservation?.checkInDate ? new Date(reservation.checkInDate) : null;
+        if (scheduledCheckIn && currentTime < scheduledCheckIn) {
+            notifications.show({
+                title: "Chưa đến giờ nhận phòng",
+                message: `Booking này chỉ được check-in từ ${formatUtils.formatDate(scheduledCheckIn, true)}.`,
+                color: "orange"
+            });
+            return;
+        }
         const missingAssignments = (reservation.allocations || []).some(a => !assignments[a.id]);
         if (missingAssignments) {
             notifications.show({
@@ -138,24 +147,17 @@ export const CheckInPage = () => {
         setSubmitting(true);
         try {
             const checkInRequest = {
-                autoAssign: false,
-                roomAssignments: Object.entries(assignments).map(([allocId, roomId]) => ({
-                    reservationRoomId: parseInt(allocId),
-                    roomId: parseInt(roomId)
-                }))
-            };
-
-            for (const allocation of reservation.allocations || []) {
-                for (const guest of occupants[allocation.id] || []) {
-                    await reservationApi.registerRoomOccupant({
-                        reservationRoomId: allocation.id,
+                roomAssignments: (reservation.allocations || []).map((allocation) => ({
+                    reservationRoomId: Number(allocation.id),
+                    roomId: Number(assignments[allocation.id]),
+                    occupants: (occupants[allocation.id] || []).map((guest) => ({
                         guestName: guest.guestName.trim(),
                         phoneNumber: guest.phoneNumber.trim(),
                         identityDocument: guest.identityDocument.trim(),
                         residence: guest.residence.trim(),
-                    });
-                }
-            }
+                    })),
+                })),
+            };
             await reservationApi.checkInReservation(id, checkInRequest);
             notifications.show({
                 message: "Check-in thành công!",
@@ -210,6 +212,9 @@ export const CheckInPage = () => {
         );
     }
 
+    const scheduledCheckIn = reservation.checkInDate ? new Date(reservation.checkInDate) : null;
+    const isTooEarly = scheduledCheckIn && currentTime < scheduledCheckIn;
+
     const SectionTitle = ({children}) => (
         <Group gap="xs" mb="md" mt={20}>
             <Box style={{width: 4, height: 24, backgroundColor: '#f26522', borderRadius: 4}} />
@@ -249,9 +254,21 @@ export const CheckInPage = () => {
                             <Text fw={700} size="lg">{reservation.customer.fullName}</Text>
                         </Grid.Col>
 
-                        <Grid.Col span={{base: 12, sm: 4}}>
+                        {/* <Grid.Col span={{base: 12, sm: 4}}>
                             <Text size="xs" c="dimmed" tt="uppercase" fw={700}>CCCD / Hộ chiếu</Text>
                             <Text fw={700} size="lg">{reservation.customer.identityCard || "—"}</Text>
+                        </Grid.Col> */}
+                        
+                        <Grid.Col span={{base: 12, sm: 4}}>
+                            <Text size="xs" c="dimmed" tt="uppercase" fw={700}>Thời gian hiện tại</Text>
+                            <Group gap={5}>
+                                <Text fw={700} c="green.7">
+                                    {formatUtils.formatDate(currentTime, true)}
+                                </Text>
+                                <Badge color={isTooEarly ? "orange" : "green"} size="xs" variant="light">
+                                    {isTooEarly ? "CHƯA ĐẾN GIỜ" : "✓ CÓ THỂ CHECK-IN"}
+                                </Badge>
+                            </Group>
                         </Grid.Col>
 
                         {/* Row 2 */}
@@ -260,15 +277,7 @@ export const CheckInPage = () => {
                             <Text fw={600}>{formatUtils.formatDate(reservation.checkInDate, true)}</Text>
                         </Grid.Col>
 
-                        <Grid.Col span={{base: 12, sm: 4}}>
-                            <Text size="xs" c="dimmed" tt="uppercase" fw={700}>Thời gian hiện tại</Text>
-                            <Group gap={5}>
-                                <Text fw={700} c="green.7">
-                                    {formatUtils.formatDate(currentTime, true)}
-                                </Text>
-                                <Badge color="green" size="xs" variant="light">✓ ĐÚNG GIỜ</Badge>
-                            </Group>
-                        </Grid.Col>
+                        
 
                         <Grid.Col span={{base: 12, sm: 4}}>
                             <Text size="xs" c="dimmed" tt="uppercase" fw={700}>Ngày trả phòng</Text>
@@ -412,6 +421,7 @@ export const CheckInPage = () => {
                             px={40} 
                             radius="md"
                             loading={submitting}
+                            disabled={Boolean(isTooEarly)}
                             onClick={handleCheckIn}
                             rightSection={<IconExternalLink size={18} />}
                         >

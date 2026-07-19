@@ -113,7 +113,7 @@ export default function TaskManagementPage() {
 
     // Render Badge Status của Task
     const renderTaskStatus = (status) => {
-        const colors = { PENDING: 'gray', IN_PROGRESS: 'blue', COMPLETED: 'green' };
+        const colors = { PENDING: 'gray', IN_PROGRESS: 'blue', COMPLETED: 'green', CANCELLED: 'red' };
         return <Badge color={colors[status] || 'gray'} variant="filled">{status}</Badge>;
     };
 

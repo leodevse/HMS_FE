@@ -90,6 +90,8 @@ export default function CheckoutPage() {
                     name: r.name,
                     quantity: r.quantity,
                     pricePerNight: r.pricePerNight,
+                    standardCapacity: r.standardCapacity,
+                    maxCapacity: r.maxCapacity,
                     total: r.total
                 })),
                 customer: {
@@ -118,7 +120,7 @@ export default function CheckoutPage() {
             }
         } catch (error) {
             console.error('Error creating booking:', error);
-            const errorMessage = error.response?.data?.error || 'An error occurred while booking. Please try again.';
+            const errorMessage = error.response?.data?.message || error.message || 'An error occurred while booking. Please try again.';
             notifications.show({
                 title: 'Error',
                 message: errorMessage,

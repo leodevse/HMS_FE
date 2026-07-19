@@ -94,6 +94,16 @@ export default function BookingPage() {
             return;
         }
 
+        const totalSelectedRooms = Object.values(quantities).reduce((sum, value) => sum + (Number(value) || 0), 0);
+        if (guests < totalSelectedRooms) {
+            notifications.show({
+                title: 'Invalid room allocation',
+                message: `At least one guest is required for each selected room (${totalSelectedRooms} rooms).`,
+                color: 'red',
+            });
+            return;
+        }
+
         const now = dayjs();
         const checkInDayjs = dayjs(checkIn);
         if (checkInDayjs.isSame(now, 'day')) {
@@ -126,6 +136,8 @@ export default function BookingPage() {
                 name: r.name,
                 quantity: quantities[r.id],
                 pricePerNight: r.basePrice,
+                standardCapacity: r.standardCapacity,
+                maxCapacity: r.maxCapacity || r.standardCapacity,
                 total: quantities[r.id] * r.basePrice * nights,
             }));
 

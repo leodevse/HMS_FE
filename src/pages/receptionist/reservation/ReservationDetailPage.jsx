@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Badge, Button, Card, Container, Divider, Grid, Group, Loader, Modal, Paper, SimpleGrid, Stack, Table, Text, Title } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
-import { IconArrowLeft, IconLogin } from '@tabler/icons-react';
+import { IconArrowLeft, IconLogin, IconLogout } from '@tabler/icons-react';
 import { reservationApi } from '../../../apis/receptionist/reservationApi';
 import { roomClassApi } from '../../../apis/receptionist/roomClassApi';
 import { formatUtils } from '../../../utils/formatUtils';
@@ -119,6 +119,11 @@ export const ReservationDetailPage = () => {
                 {reservation.status === 'PENDING' && (
                     <Group justify="flex-end">
                         <Button leftSection={<IconLogin size={17} />} onClick={() => navigate(`/receptionist/reservations/${id}/check-in`)}>Check-in</Button>
+                    </Group>
+                )}
+                {reservation.status === 'IN_HOUSE' && (
+                    <Group justify="flex-end">
+                        <Button color="green" leftSection={<IconLogout size={17} />} onClick={() => navigate(`/receptionist/reservations/${id}/check-out`)}>Payment & Check-out</Button>
                     </Group>
                 )}
             </Stack>

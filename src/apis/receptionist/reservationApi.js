@@ -138,8 +138,10 @@ export const reservationApi = {
 	 * Perform check-in for a reservation
 	 */
 	checkInReservation: async (reservationId, checkInRequest) => {
-		void checkInRequest;
-		const {data} = await axiosInstance.patch(`/bookings/reservations/${reservationId}/check-in`);
+		const {data} = await axiosInstance.patch(
+			`/bookings/reservations/${reservationId}/check-in`,
+			checkInRequest,
+		);
 		return data;
 	},
 

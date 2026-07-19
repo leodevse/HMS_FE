@@ -22,6 +22,7 @@ const normalizeTask = (task = {}) => {
         SCHEDULED: ['Scheduled', 'yellow'],
         IN_PROGRESS: ['In progress', 'blue'],
         COMPLETED: ['Completed', 'green'],
+        CANCELLED: ['Cancelled', 'red'],
     };
     const taskTypeMap = {
         CLEANING: 'Room turnover cleaning',
@@ -37,11 +38,12 @@ const normalizeTask = (task = {}) => {
         statusColor: statusMap[status]?.[1] || 'gray',
         roomStatusDisplay: task.taskType === 'CLEANING' ? 'CLEANING' : 'MAINTENANCE',
         roomStatusColor: task.taskType === 'CLEANING' ? 'violet' : 'orange',
-        checklist: task.taskType === 'CLEANING' ? CLEANING_CHECKLIST : [
+        checklist: Array.isArray(task.checklist) ? task.checklist : (task.taskType === 'CLEANING' ? CLEANING_CHECKLIST : [
             'Kiểm tra hiện trạng phòng',
             'Thực hiện công việc được giao',
             'Kiểm tra kết quả và báo cáo bất thường',
-        ],
+        ]),
+        completedSteps: Number(task.completedSteps) || 0,
     };
 };
 
@@ -62,6 +64,9 @@ export const housekeepingApi = {
     getTaskById: async (id) => wrapped(normalizeTask((await axiosInstance.get(`${TASK_URL}/${id}`)).data)),
     startTask: async (taskId) => wrapped(normalizeTask((await axiosInstance.patch(`${TASK_URL}/${taskId}/status`, {status: 'IN_PROGRESS'})).data)),
     completeTask: async (taskId) => wrapped(normalizeTask((await axiosInstance.patch(`${TASK_URL}/${taskId}/status`, {status: 'COMPLETED'})).data)),
+    updateChecklistStep: async (taskId, stepIndex, checked) => wrapped(normalizeTask(
+        (await axiosInstance.patch(`${TASK_URL}/${taskId}/checklist`, {stepIndex, checked})).data
+    )),
     getTaskCounts: async () => {
         const tasks = await getTasks();
         const scheduled = tasks.filter((task) => task.status === 'SCHEDULED').length;
@@ -72,8 +77,13 @@ export const housekeepingApi = {
     getMinibarItems: async () => wrapped([]),
     reportMinibarConsumption: async () => { throw new Error('Minibar is not implemented by the backend'); },
     getMinibarHistory: async () => wrapped([]),
-    reportDamage: async () => { throw new Error('Damage reports are not implemented by the backend'); },
-    getMyDamageReports: async () => wrapped([]),
+    reportDamage: async (report) => wrapped((await axiosInstance.post('/catalog/damage-reports', {
+        ...report,
+        staffId: currentStaffId(),
+    })).data),
+    getMyDamageReports: async () => wrapped((await axiosInstance.get('/catalog/damage-reports', {
+        params: {staffId: currentStaffId()},
+    })).data || []),
     resolveDamage: async () => { throw new Error('Damage reports are not implemented by the backend'); },
     getMySchedule: async (startDate, endDate) => {
         const staffId = currentStaffId();
@@ -96,5 +106,30 @@ export const housekeepingApi = {
         return wrapped(response.data.data[0] || null);
     },
     getScheduleSummary: async () => wrapped({}),
-    getPerformanceReport: async () => wrapped([]),
+    getPerformanceReport: async (startDate, endDate) => {
+        const [tasks, damageResponse] = await Promise.all([
+            getTasks(),
+            axiosInstance.get('/catalog/damage-reports', {params: {staffId: currentStaffId()}}),
+        ]);
+        const inPeriod = (value) => {
+            const date = String(value || '').slice(0, 10);
+            return (!startDate || date >= startDate) && (!endDate || date <= endDate);
+        };
+        const periodTasks = tasks.filter((task) => inPeriod(task.assignedAt));
+        const reports = (Array.isArray(damageResponse.data) ? damageResponse.data : []).filter((report) => inPeriod(report.createdAt));
+        const completedTasks = periodTasks.filter((task) => task.status === 'COMPLETED').length;
+        return wrapped({
+            totalTasks: periodTasks.length,
+            completedTasks,
+            completionRate: periodTasks.length ? completedTasks * 100 / periodTasks.length : 0,
+            avgTimePerTask: 0,
+            rating: null,
+            minibarRevenue: 0,
+            damageReports: reports.length,
+            damagePenalty: reports.reduce((sum, report) => sum + Number(report.penaltyAmount || 0), 0),
+            damageReportItems: reports,
+            periodStart: startDate,
+            periodEnd: endDate,
+        });
+    },
 };

@@ -6,6 +6,8 @@ import {ListRoomPage} from "../pages/receptionist/room/ListRoomPage.jsx";
 import {ListRoomOccupantPage} from "../pages/receptionist/room/ListRoomOccupantPage.jsx";
 import {ComingSoonPage} from "../pages/common/ComingSoonPage.jsx";
 import {ReservationDetailPage} from "../pages/receptionist/reservation/ReservationDetailPage.jsx";
+import {CheckoutListPage} from "../pages/receptionist/checkout/CheckoutListPage.jsx";
+import {CheckoutPage} from "../pages/receptionist/checkout/CheckoutPage.jsx";
 
 /** @type {Object.<string, RouteItemType>} */
 const RECEPTIONIST_MAP_ROUTES = {
@@ -53,14 +55,18 @@ const RECEPTIONIST_MAP_ROUTES = {
         path: "/receptionist/check-out",
         label: "Check-out",
         icon: LogOut,
-        element: <ComingSoonPage/>,
+        element: <CheckoutListPage/>,
         inNavbar: true,
+    },
+    CHECK_OUT_ID: {
+        path: "/receptionist/reservations/:id/check-out",
+        element: <CheckoutPage/>,
     },
     PAYMENT: {
         path: "/receptionist/payment",
         label: "Payment",
         icon: CreditCard,
-        element: <ComingSoonPage/>,
+        element: <CheckoutListPage/>,
         inNavbar: true,
     },
 };

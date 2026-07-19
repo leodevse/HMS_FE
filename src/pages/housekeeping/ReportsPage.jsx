@@ -306,6 +306,40 @@ export default function ReportsPage() {
                     </Grid.Col>
                 </Grid>
 
+                <Paper withBorder p="lg" radius="lg">
+                    <Title order={4} mb="md">Damage report details</Title>
+                    <Table striped highlightOnHover withTableBorder>
+                        <Table.Thead>
+                            <Table.Tr>
+                                <Table.Th>Reported at</Table.Th>
+                                <Table.Th>Room</Table.Th>
+                                <Table.Th>Item</Table.Th>
+                                <Table.Th>Description</Table.Th>
+                                <Table.Th>Qty</Table.Th>
+                                <Table.Th>Penalty</Table.Th>
+                                <Table.Th>Status</Table.Th>
+                            </Table.Tr>
+                        </Table.Thead>
+                        <Table.Tbody>
+                            {(performanceReport.damageReportItems || []).length > 0 ? (
+                                performanceReport.damageReportItems.map((report) => (
+                                    <Table.Tr key={report.id}>
+                                        <Table.Td>{report.createdAt ? format(new Date(report.createdAt), 'dd/MM/yyyy HH:mm') : '-'}</Table.Td>
+                                        <Table.Td fw={700}>{report.roomNumber}</Table.Td>
+                                        <Table.Td>{report.itemName}</Table.Td>
+                                        <Table.Td>{report.description}</Table.Td>
+                                        <Table.Td>{report.quantity}</Table.Td>
+                                        <Table.Td fw={700} c="red">{formatCurrency(report.penaltyAmount)}</Table.Td>
+                                        <Table.Td><Badge color={report.status === 'OPEN' ? 'orange' : 'green'}>{report.status}</Badge></Table.Td>
+                                    </Table.Tr>
+                                ))
+                            ) : (
+                                <Table.Tr><Table.Td colSpan={7} ta="center" c="dimmed">No damage reports in this period.</Table.Td></Table.Tr>
+                            )}
+                        </Table.Tbody>
+                    </Table>
+                </Paper>
+
                 {/* Period Information */}
                 <Paper withBorder p="lg" radius="lg">
                     <Group justify="space-between" mb="md">

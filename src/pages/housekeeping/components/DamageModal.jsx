@@ -110,17 +110,14 @@ export function DamageModal({ opened, onClose, roomId, reservationId, onSuccess 
 
         setSubmitting(true);
         try {
-            // API call would go here
-            // await housekeepingApi.reportDamage({
-            //     roomId,
-            //     reservationId,
-            //     description: formData.description,
-            //     quantity: formData.quantity,
-            //     penaltyAmount: formData.penaltyAmount
-            // });
-
-            // Simulate API call
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            await housekeepingApi.reportDamage({
+                roomId,
+                reservationId: reservationId || null,
+                itemName: formData.itemType === 'custom' ? formData.customItem : formData.selectedItem,
+                description: formData.description,
+                quantity: formData.quantity,
+                penaltyAmount: formData.penaltyAmount
+            });
 
             notifications.show({
                 title: 'Success',

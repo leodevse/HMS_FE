@@ -41,6 +41,7 @@ export default function TaskDetailPage() {
         loading,
         startTask,
         completeTask,
+        updateChecklistStep,
         reportMinibarConsumption,
         reportDamage,
         refreshAll,
@@ -57,6 +58,9 @@ export default function TaskDetailPage() {
         if (tasks.length > 0) {
             const found = tasks.find(t => t.id === parseInt(taskId));
             setTask(found);
+            if (found) {
+                setCompletedSteps(Array.from({length: found.completedSteps || 0}, (_, index) => index));
+            }
         }
     }, [tasks, taskId]);
 
@@ -67,9 +71,9 @@ export default function TaskDetailPage() {
     // Timer for tasks in progress
     useEffect(() => {
         let interval;
-        if (task?.status === 'IN_PROGRESS' && task.assignedAt) {
+        if (task?.status === 'IN_PROGRESS' && task.startedAt) {
             interval = setInterval(() => {
-                const start = new Date(task.assignedAt).getTime();
+                const start = new Date(task.startedAt).getTime();
                 const now = new Date().getTime();
                 const diff = Math.floor((now - start) / 1000); // seconds
 
@@ -90,7 +94,8 @@ export default function TaskDetailPage() {
     const handleStartTask = async () => {
         const result = await startTask(task.id);
         if (result.success) {
-            setTask(prev => ({ ...prev, status: 'IN_PROGRESS' }));
+            setTask(result.data);
+            setCompletedSteps(Array.from({length: result.data.completedSteps || 0}, (_, index) => index));
         }
     };
 
@@ -100,7 +105,7 @@ export default function TaskDetailPage() {
         }
         const result = await completeTask(task.id);
         if (result.success) {
-            setTask(prev => ({ ...prev, status: 'COMPLETED' }));
+            setTask(result.data);
         }
     };
 
@@ -176,8 +181,8 @@ export default function TaskDetailPage() {
                             </Timeline.Item>
                             <Timeline.Item bullet={<IconPlayerPlay size={12} />} title="In Progress">
                                 <Text size="sm" c="dimmed">
-                                    {task.assignedAt
-                                        ? `Started at ${new Date(task.assignedAt).toLocaleString()}`
+                                    {task.startedAt
+                                        ? `Started at ${new Date(task.startedAt).toLocaleString()}`
                                         : 'Not started yet'}
                                 </Text>
                             </Timeline.Item>
@@ -213,13 +218,16 @@ export default function TaskDetailPage() {
                                     checked={checked}
                                     disabled={task.status !== 'IN_PROGRESS' || (!checked && !previousComplete)}
                                     label={`${index + 1}. ${step}`}
-                                    onChange={(event) => {
+                                    onChange={async (event) => {
                                         const isChecked = event.currentTarget.checked;
-                                        setCompletedSteps((current) =>
-                                            isChecked
-                                                ? [...current, index]
-                                                : current.filter((item) => item < index)
-                                        );
+                                        const result = await updateChecklistStep(task.id, index, isChecked);
+                                        if (result.success) {
+                                            setTask(result.data);
+                                            setCompletedSteps(Array.from(
+                                                {length: result.data.completedSteps || 0},
+                                                (_, stepIndex) => stepIndex
+                                            ));
+                                        }
                                     }}
                                 />
                             );

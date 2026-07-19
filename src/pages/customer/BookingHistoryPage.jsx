@@ -39,6 +39,7 @@ import { useNavigate } from 'react-router-dom';
 import { customerApi } from '../../apis/customerApi.js';
 
 const statusColors = {
+    'PENDING': 'yellow',
     'PENDING_DEPOSIT': 'yellow',
     'CONFIRMED': 'blue',
     'IN_HOUSE': 'teal',
@@ -48,6 +49,7 @@ const statusColors = {
 };
 
 const statusLabels = {
+    'PENDING': 'Pending',
     'PENDING_DEPOSIT': 'Pending',
     'CONFIRMED': 'Confirmed',
     'IN_HOUSE': 'In House',
@@ -56,7 +58,7 @@ const statusLabels = {
     'CANCELLED': 'Cancelled'
 };
 
-const CANCELLABLE_STATUSES = ['PENDING_DEPOSIT', 'CONFIRMED'];
+const CANCELLABLE_STATUSES = ['PENDING', 'PENDING_DEPOSIT', 'CONFIRMED'];
 
 export default function BookingHistoryPage() {
     const navigate = useNavigate();
@@ -96,10 +98,10 @@ export default function BookingHistoryPage() {
         // Filter by tab
         if (activeTab !== 'all') {
             const statusMap = {
-                'pending': 'PENDING_DEPOSIT',
+                'pending': 'PENDING',
                 'confirmed': 'CONFIRMED',
                 'inhouse': 'IN_HOUSE',
-                'finished': 'FINISHED',
+                'finished': 'CHECKED_OUT',
                 'cancelled': 'CANCELLED'
             };
 
@@ -272,7 +274,7 @@ export default function BookingHistoryPage() {
     const isCancellable = (status) => CANCELLABLE_STATUSES.includes(status);
 
     const canReview = (booking) => {
-        return booking.status === 'FINISHED' && !booking.hasReviewed;
+        return ['FINISHED', 'CHECKED_OUT'].includes(booking.status) && !booking.hasReviewed;
     };
 
     const totalPages = Math.ceil(filteredBookings.length / itemsPerPage);
@@ -430,7 +432,7 @@ export default function BookingHistoryPage() {
                                                 </Badge>
                                             </Table.Td>
                                             <Table.Td>
-                                                {booking.status === 'FINISHED' && (
+                                                {['FINISHED', 'CHECKED_OUT'].includes(booking.status) && (
                                                     booking.hasReviewed ? (
                                                         <Badge color="green" variant="light" size="sm">
                                                             <Group gap={4}>
