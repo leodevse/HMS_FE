@@ -1,0 +1,48 @@
+@import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@300;400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+    /* Khai báo biến để Tailwind v4 hiểu class 'border-border' hoặc 'bg-background' */
+    --color-background: hsl(var(--background));
+    --color-foreground: hsl(var(--foreground));
+    --color-border: hsl(var(--border));
+    --color-primary: hsl(var(--primary));
+    /* Thêm các màu khác nếu phen muốn dùng class tailwind như text-muted... */
+}
+
+@layer base {
+    :root {
+        --background: 0 0% 97%;
+        --foreground: 220 20% 14%;
+        --primary: 174 60% 40%;
+        --border: 220 13% 91%;
+        --radius: 0.5rem;
+    }
+
+    .dark {
+        --background: 220 20% 8%;
+        --foreground: 210 40% 98%;
+        --primary: 174 60% 45%;
+        --border: 220 14% 20%;
+    }
+
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        /* Fix lỗi ở đây: dùng biến trực tiếp hoặc dùng class đã khai báo ở @theme */
+        border-color: hsl(var(--border));
+    }
+
+    body {
+        font-family: 'Be Vietnam Pro', system-ui, sans-serif;
+        background-color: hsl(var(--background));
+        color: hsl(var(--foreground));
+        -webkit-font-smoothing: antialiased;
+    }
+}
+
+#root {
+    min-height: 100vh;
+    width: 100%;
+}
