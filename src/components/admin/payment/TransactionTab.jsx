@@ -87,7 +87,7 @@ export function TransactionTab() {
                     <Select
                         label="Phương thức"
                         placeholder="Tất cả"
-                        data={['VNPAY', 'CASH', 'CREDIT_CARD', 'BANK_TRANSFER']}
+                        data={['CASH', 'CARD']}
                         value={filterMethod}
                         onChange={(val) => { setFilterMethod(val); setPage(1); }}
                         clearable
@@ -97,7 +97,7 @@ export function TransactionTab() {
                     <Select
                         label="Loại GD"
                         placeholder="Tất cả"
-                        data={['PAYMENT', 'REFUND', 'DEPOSIT']}
+                        data={['FINAL_PAYMENT', 'REFUND', 'DEPOSIT']}
                         value={filterType}
                         onChange={(val) => { setFilterType(val); setPage(1); }}
                         clearable

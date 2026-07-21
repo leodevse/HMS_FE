@@ -1,17 +1,22 @@
+import axiosInstance from '../axiosConfig';
+
+const API_URL = '/billing/refunds';
+
 export const refundApi = {
     getPendingRefunds: async (params) => {
-        // The current billing service has no refund-request resource yet.
-        // Keep the dashboard usable until that backend feature is implemented.
-        void params;
-        return { content: [] };
+        const response = await axiosInstance.get(`${API_URL}/pending`, { params });
+        return response.data;
     },
     getRefundById: async (id) => {
-        throw new Error(`Refund requests are not implemented by the backend (${id})`);
+        const response = await axiosInstance.get(`${API_URL}/${id}`);
+        return response.data;
     },
     approveRefund: async (id) => {
-        throw new Error(`Refund requests are not implemented by the backend (${id})`);
+        const response = await axiosInstance.post(`${API_URL}/${id}/approve`);
+        return response.data;
     },
     rejectRefund: async (id, rejectReason) => {
-        throw new Error(`Refund requests are not implemented by the backend (${id}: ${rejectReason})`);
+        const response = await axiosInstance.post(`${API_URL}/${id}/reject`, { rejectReason });
+        return response.data;
     }
 };

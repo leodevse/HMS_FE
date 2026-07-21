@@ -254,7 +254,7 @@ export default function HomePage() {
                                                     e.currentTarget.style.transform = 'translateY(0)';
                                                     e.currentTarget.style.boxShadow = 'none';
                                                 }}
-                                                onClick={() => navigate(`/user/rooms/${room.id}`)}
+                                                onClick={() => navigate(room.isFallback ? '/user/rooms' : `/user/rooms/${room.id}`)}
                                         >
                                             <Card.Section style={{position: 'relative'}}>
                                                 <Image
@@ -276,7 +276,7 @@ export default function HomePage() {
                                                             fontWeight: 700
                                                         }}
                                                 >
-                                                    {room.averageRating?.toFixed(1) || '5.0'} ★
+                                                    {Number(room.averageRating || 5).toFixed(1)} ★
                                                 </Badge>
                                             </Card.Section>
 
@@ -286,7 +286,7 @@ export default function HomePage() {
                                                         {room.name}
                                                     </Title>
                                                     <Text c="dimmed" size="sm" mt={5}>
-                                                        Standard {room.standardCapacity} Guests • Luxury Amenities
+                                                        Standard {room.standardCapacity || 1} Guests • Luxury Amenities
                                                     </Text>
                                                 </Box>
 
@@ -306,7 +306,9 @@ export default function HomePage() {
                                                     <Avatar.Group spacing="sm">
                                                         <Avatar size="sm" radius="xl" color="blue" src={null}/>
                                                         <Avatar size="sm" radius="xl" color="blue" src={null}/>
-                                                        <Text size="xs" fw={500} c="dimmed">+200 reviews</Text>
+                                                        <Text size="xs" fw={500} c="dimmed">
+                                                            +{Number(room.reviewCount || 200).toLocaleString('en-US')} reviews
+                                                        </Text>
                                                     </Avatar.Group>
                                                 </Group>
                                             </Stack>
@@ -457,7 +459,7 @@ export default function HomePage() {
                                                         <Text fw={700}>{item.name || 'Guest'}</Text>
                                                         <Text size="xs" c="dimmed">Verified Guest
                                                             • {item.date || 'March 2024'}</Text>
-                                                        <Rating size="xs" value={5} readOnly mt={4}/>
+                                                        <Rating size="xs" value={Number(item.rating || 5)} readOnly mt={4}/>
                                                     </Box>
                                                 </Group>
                                             </Paper>

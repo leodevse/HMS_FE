@@ -25,7 +25,7 @@ export function AdminSidebar() {
         { label: 'Customers', icon: IconUsers, to: '/admin/customers' },
         { label: 'Staff', icon: IconUsers, to: '/admin/staff' },
         { label: 'Schedules', icon: IconCalendarEvent, to: '/admin/schedules' },
-        { label: 'Tasks', icon: IconListCheck, to: '/admin/housekeeping-tasks' },
+        { label: 'Tasks', icon: IconListCheck, to: '/admin/tasks' },
         { label: 'Payments', icon: IconCoin, to: '/admin/payments' },
         { label: 'Reports', icon: IconReport, to: '/admin/reports' },
     ];
