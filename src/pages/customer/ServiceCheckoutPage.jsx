@@ -60,22 +60,30 @@ export default function ServiceCheckoutPage() {
 
         const fetchProfileAndRooms = async () => {
             try {
-                // 1. Lấy thông tin profile để có được customerId chính xác từ DB
-                const res = await authApi.getMyProfile();
-                const profileData = res.data;
-
-                if (profileData && profileData.id) {
-                    const cId = profileData.id;
-                    setCustomerId(cId);
-
-                    // 2. Lấy danh sách phòng đang sử dụng (IN_HOUSE)
-                    const data = await getActiveAllocations(cId);
-                    const options = data.map(alloc => ({
-                        value: String(alloc.allocationId),
-                        label: `${alloc.roomNumber} - ${alloc.roomClassName}`
-                    }));
-                    setActiveRooms(options);
+                // Prefer JWT/user id from auth context; /auth/me is optional.
+                let cId = customer?.id || customer?.userId || null;
+                try {
+                    const profileData = await authApi.getMyProfile();
+                    if (profileData?.id) {
+                        cId = profileData.id;
+                    }
+                } catch {
+                    // Gateway may not expose /auth/me; local auth user id is enough.
                 }
+
+                if (!cId) {
+                    return;
+                }
+
+                setCustomerId(cId);
+
+                // Rooms from PENDING (already assigned) or IN_HOUSE stays
+                const data = await getActiveAllocations(cId);
+                const options = data.map((alloc) => ({
+                    value: String(alloc.allocationId),
+                    label: `${alloc.roomNumber} - ${alloc.roomClassName} (${alloc.bookingStatus})`,
+                }));
+                setActiveRooms(options);
             } catch (error) {
                 console.error("Error isLoading profile or rooms:", error);
             } finally {

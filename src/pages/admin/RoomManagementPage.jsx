@@ -164,7 +164,7 @@ function RoomDetailsModal({opened, room, onClose}) {
                     </Group>
                     <Group justify="space-between">
                         <Text fw={600}>Rate per Night</Text>
-                        <Text>{room.baseRate != null ? `$${Number(room.baseRate).toFixed(0)}` : '-'}</Text>
+                        <Text>{room.baseRate != null ? `$${Number(room.baseRate).toLocaleString('en-US')}` : '-'}</Text>
                     </Group>
                     <div>
                         <Text fw={600} mb={4}>Description</Text>
@@ -417,7 +417,7 @@ export default function RoomManagementPage() {
                                                 </Badge>
                                             </Table.Td>
                                             <Table.Td>
-                                                <Text size="sm">${room.baseRate != null ? Number(room.baseRate).toFixed(0) : '—'}</Text>
+                                                <Text size="sm">{room.baseRate != null ? `$${Number(room.baseRate).toLocaleString('en-US')}` : '—'}</Text>
                                             </Table.Td>
                                             <Table.Td>
                                                 <Group gap={4} wrap="nowrap">

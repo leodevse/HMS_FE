@@ -27,6 +27,7 @@ function toUiRoom(item) {
         roomNumber: item.roomNumber,
         roomClassId: item.roomClass?.id,
         roomClassName: item.roomClass?.className,
+        baseRate: item.roomClass?.basePrice,
         status: roomStatusLabelMap[item.status] || item.status,
         description: item.description || '',
         isActive: item.isActive,

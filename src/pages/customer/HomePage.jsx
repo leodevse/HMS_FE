@@ -473,7 +473,7 @@ export default function HomePage() {
                 {/* ── Final Call to Action ── */}
                 <Box py={80}>
                     <Container size="xl">
-                        <Paper
+                        {/* <Paper
                                 p={60}
                                 radius="30px"
                                 style={{
@@ -481,6 +481,7 @@ export default function HomePage() {
                                     color: '#fff',
                                     textAlign: 'center'
                                 }}
+                                
                         >
                             <Stack align="center" gap="md">
                                 <Title order={2} fw={800} style={{fontSize: '38px', letterSpacing: '-0.5px'}}>
@@ -501,7 +502,7 @@ export default function HomePage() {
                                     Reserve Your Room Now
                                 </Button>
                             </Stack>
-                        </Paper>
+                        </Paper> */}
                     </Container>
                 </Box>
             </Box>
