@@ -400,7 +400,7 @@ export default function RoomDetailPage() {
                                             <Text fw={600} mb="xs" style={{ fontSize: '16px' }}>Check-out</Text>
                                             <Text c="dimmed" style={{ fontSize: '15px' }}>20 minutes before</Text>
                                         </Box>
-                                        <Box>
+                                        {/* <Box>
                                             <Text fw={600} mb="xs" style={{ fontSize: '16px' }}>Cancellation</Text>
                                             <Text c="dimmed" style={{ fontSize: '15px' }}>Free cancellation up to 48 hours before</Text>
                                         </Box>
@@ -409,7 +409,7 @@ export default function RoomDetailPage() {
                                             <Text c="dimmed" style={{ fontSize: '15px' }}>
                                                 {formatPrice(roomData.extraPersonFee)} / person over standard ({roomData.standardCapacity} guests)
                                             </Text>
-                                        </Box>
+                                        </Box> */}
                                     </Stack>
                                 </Box>
                             </Tabs.Panel>
@@ -625,14 +625,17 @@ export default function RoomDetailPage() {
                                                     </Text>
                                                     <Text c="dimmed" size="xs">/ night</Text>
                                                 </Box>
-                                                <Button
+                                                
+                                            </Group>
+                                            <Button
+                                                    fullWidth
+                                                    mt="md"
                                                     size="xs"
                                                     color="blue"
                                                     rightSection={<IconChevronRight size={14} />}
                                                 >
                                                     View
                                                 </Button>
-                                            </Group>
                                         </Box>
                                     </Card>
                                 </Grid.Col>

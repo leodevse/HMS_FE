@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import {
-    Title, Paper, Group, Button, Table, Text,
-    ActionIcon, Badge, LoadingOverlay, Tooltip
+    Title, Button, Table, Text, LoadingOverlay, Tooltip, Badge
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { modals } from '@mantine/modals';
@@ -119,67 +118,255 @@ export default function ScheduleManagementPage() {
         });
     };
 
-    // Helper render Badge theo Status
-    const renderStatusBadge = (schedule) => {
-        let color = 'blue';
-        if (schedule.status === 'ON_LEAVE') color = 'orange';
-        if (schedule.status === 'COMPLETED') color = 'green';
+    // Render shift badge with professional styling
+    const renderShiftBadge = (schedule) => {
+        const shiftName = schedule.shiftName || '';
+        let displayText = 'Off';
+        let backgroundColor = 'white';
+        let textColor = '#333';
+        let borderStyle = '1.5px solid #333';
+
+        // Map Vietnamese shift names to display text and determine styling
+        const shiftNameLower = shiftName.toLowerCase();
+        
+        if (shiftNameLower.includes('đêm') || shiftNameLower.includes('night')) {
+            displayText = 'Night';
+            backgroundColor = '#999';
+            textColor = 'white';
+            borderStyle = 'none';
+        } else if (
+            shiftNameLower.includes('sáng') || 
+            shiftNameLower.includes('chiều') || 
+            shiftNameLower.includes('day') ||
+            shiftNameLower.includes('morning') ||
+            shiftNameLower.includes('afternoon')
+        ) {
+            displayText = 'Day';
+            backgroundColor = '#000';
+            textColor = 'white';
+            borderStyle = 'none';
+        } else if (shiftNameLower.includes('off')) {
+            displayText = 'Off';
+            backgroundColor = 'white';
+            textColor = '#333';
+            borderStyle = '1.5px solid #333';
+        } else if (shiftName === '' || schedule.status === 'OFF') {
+            displayText = 'Off';
+            backgroundColor = 'white';
+            textColor = '#333';
+            borderStyle = '1.5px solid #333';
+        }
 
         return (
-            <Tooltip label="Click để xóa" withArrow position="top">
-                <Badge
-                    color={color}
-                    variant="light"
-                    style={{ cursor: 'pointer', display: 'block', margin: '4px 0' }}
+            <Tooltip 
+                label="Click to delete" 
+                withArrow 
+                position="top"
+            >
+                <button
                     onClick={() => handleDeleteSchedule(schedule.id)}
+                    style={{
+                        backgroundColor: backgroundColor,
+                        color: textColor,
+                        border: borderStyle,
+                        borderRadius: '8px',
+                        padding: '6px 12px',
+                        fontSize: '13px',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        width: '75px',
+                        transition: 'all 0.2s',
+                        display: 'inline-block',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis'
+                    }}
+                    onMouseEnter={(e) => {
+                        e.target.style.opacity = '0.8';
+                        e.target.style.transform = 'scale(1.05)';
+                    }}
+                    onMouseLeave={(e) => {
+                        e.target.style.opacity = '1';
+                        e.target.style.transform = 'scale(1)';
+                    }}
                 >
-                    {/* Giả định DTO trả về shiftName, nếu không có bạn nối tên ca ở backend nhé */}
-                    {schedule.shiftName || `Ca ID: ${schedule.shiftId}`} <br/>
-                    <span style={{fontSize: '10px'}}>({schedule.status})</span>
-                </Badge>
+                    {displayText}
+                </button>
             </Tooltip>
         );
     };
 
+    // Format week display (e.g., "Nov 20 - Nov 26, 2023")
+    const formatWeekDisplay = () => {
+        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const startMonth = monthNames[startOfWeek.getMonth()];
+        const endMonth = monthNames[endOfWeek.getMonth()];
+        const startDay = startOfWeek.getDate();
+        const endDay = endOfWeek.getDate();
+        const year = endOfWeek.getFullYear();
+
+        if (startMonth === endMonth) {
+            return `${startMonth} ${startDay} - ${endDay}, ${year}`;
+        }
+        return `${startMonth} ${startDay} - ${endMonth} ${endDay}, ${year}`;
+    };
+
     return (
-        <div style={{ position: 'relative', minHeight: '500px' }}>
+        <div style={{ position: 'relative', minHeight: '100vh', backgroundColor: '#f9f9f9' }}>
             <LoadingOverlay visible={loading} zIndex={1000} overlayProps={{ radius: "sm", blur: 2 }} />
 
-            <Group justify="space-between" mb="lg">
-                <Title order={2}>Lịch làm việc</Title>
-                <Button leftSection={<IconPlus size={16} />} onClick={openCreate}>
-                    Tạo lịch làm việc
+            {/* Header Section */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                <Title order={2} style={{ fontSize: '28px', fontWeight: 700, color: '#1a1a1a', margin: 0 }}>
+                    Schedule Management
+                </Title>
+                <Button 
+                    leftSection={<IconPlus size={18} />} 
+                    onClick={openCreate}
+                    style={{
+                        backgroundColor: '#007bff',
+                        color: 'white',
+                        fontWeight: 600,
+                        fontSize: '14px',
+                        padding: '10px 16px',
+                        borderRadius: '6px',
+                        border: 'none',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s'
+                    }}
+                >
+                    Assign Schedule
                 </Button>
-            </Group>
+            </div>
 
-            <Paper shadow="sm" p="md" mb="xl" radius="md" withBorder>
-                {/* Thanh điều hướng tuần */}
-                <Group justify="center" mb="xl">
-                    <ActionIcon variant="light" color="blue" onClick={handlePrevWeek} size="lg">
-                        <IconChevronLeft />
-                    </ActionIcon>
+            {/* Main Card Container */}
+            <div 
+                style={{
+                    backgroundColor: 'white',
+                    borderRadius: '8px',
+                    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.08)',
+                    padding: '24px',
+                    border: '1px solid #e0e0e0'
+                }}
+            >
+                {/* Week Navigation */}
+                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', marginBottom: '24px', gap: '20px' }}>
+                    <button
+                        onClick={handlePrevWeek}
+                        style={{
+                            backgroundColor: 'white',
+                            border: '1px solid #d0d0d0',
+                            borderRadius: '6px',
+                            width: '36px',
+                            height: '36px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s',
+                            padding: 0
+                        }}
+                        onMouseEnter={(e) => {
+                            e.target.style.backgroundColor = '#f5f5f5';
+                            e.target.style.borderColor = '#999';
+                        }}
+                        onMouseLeave={(e) => {
+                            e.target.style.backgroundColor = 'white';
+                            e.target.style.borderColor = '#d0d0d0';
+                        }}
+                    >
+                        <IconChevronLeft size={20} color="#666" />
+                    </button>
 
-                    <Text fw={600} size="lg" w={250} ta="center">
-                        Tuần: {formatDateToYYYYMMDD(startOfWeek)} <br/>đến {formatDateToYYYYMMDD(endOfWeek)}
-                    </Text>
+                    <div style={{ minWidth: '200px', textAlign: 'center' }}>
+                        <Text 
+                            style={{
+                                fontSize: '16px',
+                                fontWeight: 600,
+                                color: '#1a1a1a',
+                                margin: 0
+                            }}
+                        >
+                            {formatWeekDisplay()}
+                        </Text>
+                    </div>
 
-                    <ActionIcon variant="light" color="blue" onClick={handleNextWeek} size="lg">
-                        <IconChevronRight />
-                    </ActionIcon>
-                </Group>
+                    <button
+                        onClick={handleNextWeek}
+                        style={{
+                            backgroundColor: 'white',
+                            border: '1px solid #d0d0d0',
+                            borderRadius: '6px',
+                            width: '36px',
+                            height: '36px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s',
+                            padding: 0
+                        }}
+                        onMouseEnter={(e) => {
+                            e.target.style.backgroundColor = '#f5f5f5';
+                            e.target.style.borderColor = '#999';
+                        }}
+                        onMouseLeave={(e) => {
+                            e.target.style.backgroundColor = 'white';
+                            e.target.style.borderColor = '#d0d0d0';
+                        }}
+                    >
+                        <IconChevronRight size={20} color="#666" />
+                    </button>
+                </div>
 
-                {/* BẢNG LỊCH (MATRIX) */}
-                <div style={{ overflowX: 'auto' }}>
-                    <Table striped highlightOnHover withTableBorder withColumnBorders>
+                {/* Schedule Table */}
+                <div style={{ overflowX: 'auto', marginBottom: '16px' }}>
+                    <Table 
+                        style={{
+                            borderCollapse: 'collapse',
+                            width: '100%',
+                            fontSize: '14px'
+                        }}
+                    >
                         <Table.Thead>
-                            <Table.Tr>
-                                <Table.Th style={{ minWidth: '180px' }}>Nhân viên</Table.Th>
+                            <Table.Tr 
+                                style={{
+                                    backgroundColor: '#f5f5f5',
+                                    borderBottom: '2px solid #e0e0e0'
+                                }}
+                            >
+                                <Table.Th 
+                                    style={{
+                                        padding: '12px 16px',
+                                        textAlign: 'left',
+                                        fontWeight: 700,
+                                        color: '#333',
+                                        width: '160px',
+                                        minWidth: '160px',
+                                        border: '1px solid #e0e0e0'
+                                    }}
+                                >
+                                    Staff Member
+                                </Table.Th>
                                 {weekDays.map((day, index) => {
-                                    const dayNames = ['CN', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
+                                    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                                    const dayName = dayNames[day.getDay()];
+                                    const dayDate = day.getDate();
                                     return (
-                                        <Table.Th key={index} style={{ textAlign: 'center', minWidth: '120px' }}>
-                                            {dayNames[day.getDay()]} <br/>
-                                            <Text size="xs" c="dimmed">{formatDateToYYYYMMDD(day)}</Text>
+                                        <Table.Th 
+                                            key={index}
+                                            style={{
+                                                padding: '12px 8px',
+                                                textAlign: 'center',
+                                                fontWeight: 700,
+                                                color: '#333',
+                                                minWidth: '100px',
+                                                width: '100px',
+                                                border: '1px solid #e0e0e0'
+                                            }}
+                                        >
+                                            <div style={{ fontSize: '14px', fontWeight: 700 }}>{dayName}</div>
+                                            <div style={{ fontSize: '12px', color: '#666', fontWeight: 500 }}>{dayDate}</div>
                                         </Table.Th>
                                     );
                                 })}
@@ -187,33 +374,63 @@ export default function ScheduleManagementPage() {
                         </Table.Thead>
                         <Table.Tbody>
                             {staffs.length > 0 ? (
-                                staffs.map((staff) => (
-                                    <Table.Tr key={staff.id}>
-                                        {/* Cột Tên NV */}
-                                        <Table.Td fw={500}>
-                                            {staff.fullName}
-                                            <Text size="xs" c="dimmed">{staff.department}</Text>
+                                staffs.map((staff, rowIndex) => (
+                                    <Table.Tr 
+                                        key={staff.id}
+                                        style={{
+                                            borderBottom: '1px solid #e0e0e0',
+                                            backgroundColor: rowIndex % 2 === 0 ? 'white' : '#fafafa',
+                                            transition: 'background-color 0.2s'
+                                        }}
+                                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f0f7ff'}
+                                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = rowIndex % 2 === 0 ? 'white' : '#fafafa'}
+                                    >
+                                        {/* Staff Name Cell */}
+                                        <Table.Td 
+                                            style={{
+                                                padding: '12px 16px',
+                                                fontWeight: 600,
+                                                color: '#1a1a1a',
+                                                verticalAlign: 'middle',
+                                                border: '1px solid #e0e0e0'
+                                            }}
+                                        >
+                                            <div style={{ fontWeight: 700, fontSize: '14px', marginBottom: '4px' }}>
+                                                {staff.fullName}
+                                            </div>
+                                            <div style={{ fontSize: '12px', color: '#666', fontWeight: 500 }}>
+                                                {staff.department || 'N/A'}
+                                            </div>
                                         </Table.Td>
 
-                                        {/* 7 Cột Ngày trong tuần */}
+                                        {/* Day Cells */}
                                         {weekDays.map((day, index) => {
                                             const dayStr = formatDateToYYYYMMDD(day);
-                                            // Lọc ra ca làm việc của nhân viên này trong ngày hôm đó
-                                            // Chú ý: Backend cần trả về workDate chuẩn dạng YYYY-MM-DD
                                             const staffSchedules = schedules.filter(
                                                 s => s.staffId === staff.id && s.workDate === dayStr
                                             );
 
                                             return (
-                                                <Table.Td key={index} style={{ textAlign: 'center', verticalAlign: 'top' }}>
+                                                <Table.Td 
+                                                    key={index}
+                                                    style={{
+                                                        padding: '12px 8px',
+                                                        textAlign: 'center',
+                                                        verticalAlign: 'middle',
+                                                        border: '1px solid #e0e0e0',
+                                                        height: '70px'
+                                                    }}
+                                                >
                                                     {staffSchedules.length > 0 ? (
-                                                        staffSchedules.map(schedule => (
-                                                            <div key={schedule.id}>
-                                                                {renderStatusBadge(schedule)}
-                                                            </div>
-                                                        ))
+                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
+                                                            {staffSchedules.map(schedule => (
+                                                                <div key={schedule.id} style={{ width: '100%' }}>
+                                                                    {renderShiftBadge(schedule)}
+                                                                </div>
+                                                            ))}
+                                                        </div>
                                                     ) : (
-                                                        <Text size="xs" c="gray.4">-</Text>
+                                                        <Text size="xs" c="gray.5" style={{ color: '#ccc' }}>-</Text>
                                                     )}
                                                 </Table.Td>
                                             );
@@ -222,15 +439,31 @@ export default function ScheduleManagementPage() {
                                 ))
                             ) : (
                                 <Table.Tr>
-                                    <Table.Td colSpan={8} style={{ textAlign: 'center', padding: '2rem' }}>
-                                        <Text c="dimmed">Chưa có dữ liệu nhân viên</Text>
+                                    <Table.Td colSpan={8} style={{ textAlign: 'center', padding: '40px 16px', color: '#999', border: '1px solid #e0e0e0' }}>
+                                        <Text c="dimmed">No staff data available</Text>
                                     </Table.Td>
                                 </Table.Tr>
                             )}
                         </Table.Tbody>
                     </Table>
                 </div>
-            </Paper>
+
+                {/* Legend */}
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '16px', marginTop: '20px', borderTop: '1px solid #e0e0e0', paddingTop: '12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <div style={{ width: '16px', height: '16px', backgroundColor: '#000', borderRadius: '3px' }}></div>
+                        <Text size="sm" style={{ color: '#333', fontWeight: 500 }}>Day</Text>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <div style={{ width: '16px', height: '16px', backgroundColor: '#999', borderRadius: '3px' }}></div>
+                        <Text size="sm" style={{ color: '#333', fontWeight: 500 }}>Night</Text>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <div style={{ width: '16px', height: '16px', backgroundColor: 'white', border: '1.5px solid #333', borderRadius: '3px' }}></div>
+                        <Text size="sm" style={{ color: '#333', fontWeight: 500 }}>Off</Text>
+                    </div>
+                </div>
+            </div>
 
             <ScheduleCreateModal
                 opened={createOpened}
