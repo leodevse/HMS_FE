@@ -325,19 +325,11 @@ export default function RoomManagementPage() {
                 <Group justify="space-between" align="center">
                     <div>
                         <Title order={1}>Manage Rooms</Title>
-                        <Text c="dimmed" mt={4}>Room management synced with database schema.</Text>
                     </div>
 
                     <Button leftSection={<IconPlus size={16}/>} onClick={openCreateModal}>
                         Add New Room
                     </Button>
-                </Group>
-
-                <Group>
-                    <Badge size="lg" variant="light" color="blue">Total: {roomStats.total}</Badge>
-                    <Badge size="lg" variant="light" color="green">Available: {roomStats.available}</Badge>
-                    <Badge size="lg" variant="light" color="red">Occupied: {roomStats.occupied}</Badge>
-                    <Badge size="lg" variant="light" color="orange">Maintenance: {roomStats.maintenance}</Badge>
                 </Group>
 
                 <Paper withBorder radius="lg" p="lg">
@@ -381,6 +373,7 @@ export default function RoomManagementPage() {
                                     <Table.Tr>
                                         <Table.Th>Room</Table.Th>
                                         <Table.Th>Room Class</Table.Th>
+                                        <Table.Th>Floor</Table.Th>
                                         <Table.Th>Status</Table.Th>
                                         <Table.Th>Description</Table.Th>
                                         <Table.Th>Action</Table.Th>
@@ -391,6 +384,7 @@ export default function RoomManagementPage() {
                                             <Table.Tr key={room.id}>
                                                 <Table.Td fw={600}>{room.roomNumber}</Table.Td>
                                                 <Table.Td>{room.roomClassName || '-'}</Table.Td>
+                                                <Table.Td>{room.floor ?? '-'}</Table.Td>
                                                 <Table.Td>
                                                     <Badge color={statusColorMap[room.status]} variant="light">
                                                         {room.status}
@@ -430,7 +424,7 @@ export default function RoomManagementPage() {
                                             </Table.Tr>
                                     )) : (
                                             <Table.Tr>
-                                                <Table.Td colSpan={5}>
+                                                <Table.Td colSpan={6}>
                                                     <Text ta="center" py="lg" c="dimmed">
                                                         No rooms matched the current filters.
                                                     </Text>
