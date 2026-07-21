@@ -74,30 +74,13 @@ export default function AdminDashboardPage() {
     const readyRatio = statsData?.totalRooms ? ((statsData.readyRooms ?? 0) / statsData.totalRooms) * 100 : 0;
     const bookedRatio = statsData?.totalRooms ? ((statsData.bookedRooms ?? 0) / statsData.totalRooms) * 100 : 0;
 
-    const roomTypeColors = ['blue', 'green', 'teal', 'orange', 'violet', 'cyan', 'red'];
-    const knownRoomTypeLabels = ['Deluxe Room', 'Family Room', 'Standard Room'];
+    const roomTypes = [
+        { label: 'Deluxe Room', value: statsData?.deluxeRooms ?? 0, color: 'blue' },
+        { label: 'Family Room', value: statsData?.familyRooms ?? 0, color: 'green' },
+        { label: 'Standard Room', value: statsData?.standardRooms ?? 0, color: 'teal' },
+    ];
 
-    const roomTypeCounts = statsData?.roomTypeCounts && Object.keys(statsData.roomTypeCounts).length > 0
-        ? { ...statsData.roomTypeCounts }
-        : {
-            'Deluxe Room': statsData?.deluxeRooms ?? 0,
-            'Family Room': statsData?.familyRooms ?? 0,
-            'Standard Room': statsData?.standardRooms ?? 0,
-        };
-
-    knownRoomTypeLabels.forEach((label) => {
-        if (!(label in roomTypeCounts)) {
-            roomTypeCounts[label] = 0;
-        }
-    });
-
-    const roomTypes = Object.entries(roomTypeCounts).map(([label, value], index) => ({
-        label,
-        value,
-        color: roomTypeColors[index % roomTypeColors.length],
-    }));
     const roomTypeTotal = roomTypes.reduce((sum, roomType) => sum + roomType.value, 0);
-    const displayRoomTotal = roomTypeTotal || statsData?.totalRooms || 0;
     const pieCircumference = 2 * Math.PI * 16;
     const pieSegments = [];
     let pieOffset = 0;
@@ -242,7 +225,7 @@ export default function AdminDashboardPage() {
                                 </svg>
                                 <Box style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center' }}>
                                     <Text size="sm" c="dimmed">Total</Text>
-                                    <Text fw={700}>{displayRoomTotal}</Text>
+                                    <Text fw={700}>{roomTypeTotal}</Text>
                                 </Box>
                             </Box>
                         </Box>
