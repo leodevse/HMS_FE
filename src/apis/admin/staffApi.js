@@ -53,6 +53,13 @@ export const staffApi = {
         employmentStatus: data.status || 'AVAILABLE',
         active: data.isActive ?? true,
     })).data,
+    updateStaff: async (id, data) => normalizeStaff((await axiosInstance.put(`/auth/users/${id}`, {
+        fullName: data.fullName,
+        phoneNumber: data.phoneNumber,
+        department: data.department,
+        employmentStatus: data.status,
+        active: data.isActive,
+    })).data),
     updateStaffStatus: async (id, isActive) => normalizeStaff((await axiosInstance.put(`/auth/users/${id}`, {
         active: isActive,
     })).data),

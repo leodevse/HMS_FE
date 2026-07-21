@@ -3,16 +3,18 @@ import {
     Title, Paper, Group, TextInput, Select, Button,
     Table, Badge, Pagination, Text, LoadingOverlay, Grid, Switch, ActionIcon
 } from '@mantine/core';
-import { useDisclosure, useDebouncedValue } from '@mantine/hooks';
+import { useDisclosure } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
-import { IconAt, IconFilter, IconEye } from '@tabler/icons-react';
+import { IconAt, IconEye, IconEdit } from '@tabler/icons-react';
 import { modals } from '@mantine/modals';
 
 import { userApi } from '../../apis/admin/userApi';
 import { UserDetailModal } from '../../components/admin/user/UserDetailModal';
+import { UserEditModal } from '../../components/admin/user/UserEditModal';
 
 export default function UserManagementPage() {
     // ---- STATES ----
+    const PAGE_SIZE = 6;
     const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(false);
     const [totalElements, setTotalElements] = useState(0);
@@ -21,32 +23,43 @@ export default function UserManagementPage() {
 
     // ---- MODALS ----
     const [detailOpened, { open: openDetail, close: closeDetail }] = useDisclosure(false);
+    const [editOpened, { open: openEdit, close: closeEdit }] = useDisclosure(false);
     const [selectedUser, setSelectedUser] = useState(null);
 
     // ---- FILTERS ----
-    const [searchEmail, setSearchEmail] = useState('');
-    const [filterIsActive, setFilterIsActive] = useState(null);
-    const [debouncedEmail] = useDebouncedValue(searchEmail, 500);
+    const [filterField, setFilterField] = useState('email');
+    const [searchQuery, setSearchQuery] = useState('');
+    const [appliedSearch, setAppliedSearch] = useState('');
+    const [appliedField, setAppliedField] = useState('email');
+    const [filterRole, setFilterRole] = useState(null);
+    const [filterStatus, setFilterStatus] = useState(null);
 
-    // ---- FETCH DỮ LIỆU ----
+    // ---- FETCH DATA ----
     const fetchUsers = async () => {
         setLoading(true);
         try {
             const params = {
                 page: page - 1,
-                size: 6,
-                email: debouncedEmail || undefined,
-                isActive: filterIsActive !== null ? filterIsActive === 'true' : undefined
+                size: PAGE_SIZE,
+                role: filterRole || undefined,
+                isActive: filterStatus !== null ? filterStatus === 'true' : undefined,
             };
 
-            const res = await userApi.getCustomersPage(params);
+            if (appliedField === 'email') {
+                params.email = appliedSearch || undefined;
+            } else if (appliedField === 'name') {
+                params.name = appliedSearch || undefined;
+            } else if (appliedField === 'id') {
+                params.id = appliedSearch || undefined;
+            }
 
+            const res = await userApi.getUsersPage(params);
             setUsers(res.content || []);
             setTotalPages(res.totalPages || 1);
             setTotalElements(res.totalElements || 0);
         } catch (error) {
             console.error(error);
-            notifications.show({ title: 'Lỗi', message: 'Không thể tải danh sách người dùng', color: 'red' });
+            notifications.show({ title: 'Error', message: 'Unable to load user list', color: 'red' });
         } finally {
             setLoading(false);
         }
@@ -55,11 +68,21 @@ export default function UserManagementPage() {
     useEffect(() => {
         fetchUsers();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [page, debouncedEmail, filterIsActive]);
+    }, [page, appliedSearch, appliedField, filterRole, filterStatus]);
+
+    const handleSearch = () => {
+        setAppliedField(filterField);
+        setAppliedSearch(searchQuery);
+        setPage(1);
+    };
 
     const handleClearFilters = () => {
-        setSearchEmail('');
-        setFilterIsActive(null);
+        setFilterField('email');
+        setSearchQuery('');
+        setAppliedSearch('');
+        setAppliedField('email');
+        setFilterRole(null);
+        setFilterStatus(null);
         setPage(1);
     };
 
@@ -69,22 +92,27 @@ export default function UserManagementPage() {
         openDetail();
     };
 
+    const handleEditUser = (user) => {
+        setSelectedUser(user);
+        openEdit();
+    };
+
     const handleToggleStatus = (user) => {
         const newStatus = !user.isActive;
-        const actionText = newStatus ? 'mở khóa' : 'khóa';
+        const actionText = newStatus ? 'unlock' : 'disable';
 
         modals.openConfirmModal({
-            title: `Xác nhận ${actionText} tài khoản`,
-            children: <Text size="sm">Bạn có chắc chắn muốn {actionText} tài khoản của <b>{user.email}</b> không?</Text>,
-            labels: { confirm: 'Xác nhận', cancel: 'Hủy' },
+            title: `Confirm ${actionText} account`,
+            children: <Text size="sm">Are you sure you want to {actionText} the account of <b>{user.email}</b>?</Text>,
+            labels: { confirm: 'Confirm', cancel: 'Cancel' },
             confirmProps: { color: newStatus ? 'green' : 'red' },
             onConfirm: async () => {
                 try {
                     await userApi.updateUserStatus(user.id, newStatus);
-                    notifications.show({ title: 'Thành công', message: `Đã ${actionText} tài khoản!`, color: 'green' });
+                    notifications.show({ title: 'Success', message: `Account ${actionText}d!`, color: 'green' });
                     fetchUsers();
                 } catch (error) {
-                    notifications.show({ title: 'Lỗi', message: 'Cập nhật trạng thái thất bại', color: 'red' });
+                    notifications.show({ title: 'Error', message: 'Failed to update account status', color: 'red' });
                 }
             },
         });
@@ -94,70 +122,108 @@ export default function UserManagementPage() {
         <div style={{ position: 'relative', minHeight: '400px' }}>
             <LoadingOverlay visible={loading} zIndex={1000} overlayProps={{ radius: "sm", blur: 2 }} />
 
-            <Group justify="space-between" mb="lg">
-                <Title order={2}>Quản lý Người dùng (Khách hàng)</Title>
+            <Group justify="space-between" mb="sm">
+                <div>
+                    <Title order={1}>User Management</Title>
+                    <Text size="md" c="dimmed">User Directory</Text>
+                </div>
             </Group>
 
             <Paper shadow="sm" p="md" mb="xl" radius="md" withBorder>
-                {/* --- BỘ LỌC TÌM KIẾM --- */}
+                {/* --- SEARCH FILTER --- */}
                 <Grid mb="md" align="flex-end">
-                    <Grid.Col span={{ base: 12, sm: 5 }}>
-                        <TextInput
-                            label="Email"
-                            placeholder="Tìm kiếm theo email..."
-                            leftSection={<IconAt size={16} />}
-                            value={searchEmail}
-                            onChange={(e) => { setSearchEmail(e.currentTarget.value); setPage(1); }}
-                        />
-                    </Grid.Col>
-
-                    <Grid.Col span={{ base: 12, sm: 4 }}>
+                    <Grid.Col span={{ base: 12, md: 2 }}>
                         <Select
-                            label="Trạng thái tài khoản"
-                            placeholder="Tất cả"
-                            leftSection={<IconFilter size={16} />}
+                            label="Filter by"
                             data={[
-                                { value: 'true', label: 'Đang hoạt động (Active)' },
-                                { value: 'false', label: 'Bị khóa (Disabled)' },
+                                { value: 'id', label: 'ID' },
+                                { value: 'name', label: 'Name' },
+                                { value: 'email', label: 'Email' },
                             ]}
-                            value={filterIsActive}
-                            onChange={(val) => { setFilterIsActive(val); setPage(1); }}
-                            clearable
+                            value={filterField}
+                            onChange={(val) => setFilterField(val)}
+                            withinPortal
                         />
                     </Grid.Col>
 
-                    <Grid.Col span={{ base: 12, sm: 3 }}>
-                        <Button variant="light" color="gray" fullWidth onClick={handleClearFilters}>
-                            Xóa bộ lọc
+                    <Grid.Col span={{ base: 12, md: 4 }}>
+                        <TextInput
+                            placeholder="Search keyword..."
+                            leftSection={<IconAt size={16} />}
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.currentTarget.value)}
+                        />
+                    </Grid.Col>
+
+                    <Grid.Col span={{ base: 12, md: 2 }}>
+                        <Select
+                            label="Role"
+                            placeholder="All"
+                            data={[
+                                { value: 'ADMIN', label: 'Admin' },
+                                { value: 'MANAGER', label: 'Manager' },
+                                { value: 'STAFF', label: 'Staff' },
+                                { value: 'RECEPTIONIST', label: 'Receptionist' },
+                                { value: 'CUSTOMER', label: 'Customer' },
+                            ]}
+                            value={filterRole}
+                            onChange={(val) => setFilterRole(val)}
+                            clearable
+                            withinPortal
+                        />
+                    </Grid.Col>
+
+                    <Grid.Col span={{ base: 12, md: 2 }}>
+                        <Select
+                            label="Status"
+                            placeholder="All"
+                            data={[
+                                { value: 'true', label: 'Active' },
+                                { value: 'false', label: 'Inactive' },
+                            ]}
+                            value={filterStatus}
+                            onChange={(val) => setFilterStatus(val)}
+                            clearable
+                            withinPortal
+                        />
+                    </Grid.Col>
+
+                    <Grid.Col span={{ base: 12, md: 2 }}>
+                        <Button fullWidth onClick={handleSearch}>
+                            Filter
                         </Button>
                     </Grid.Col>
                 </Grid>
 
-                <Group justify="flex-end" mb="sm">
-                    <Text size="sm" c="dimmed" fw={500}>Tìm thấy: {totalElements} người dùng</Text>
+                <Group position="apart" mb="sm">
+                    <Text size="sm" c="dimmed" fw={500}>
+                        Showing {users.length > 0 ? `${(page - 1) * PAGE_SIZE + 1} - ${Math.min(page * PAGE_SIZE, totalElements)}` : '0'} of {totalElements} users
+                    </Text>
                 </Group>
 
-                {/* --- BẢNG DỮ LIỆU --- */}
+                {/* --- USER TABLE --- */}
                 <Table striped highlightOnHover verticalSpacing="sm">
                     <Table.Thead>
                         <Table.Tr>
+                            <Table.Th>No.</Table.Th>
                             <Table.Th>ID</Table.Th>
-                            <Table.Th>Họ và tên</Table.Th>
+                            <Table.Th>Name</Table.Th>
                             <Table.Th>Email</Table.Th>
-                            <Table.Th>Số điện thoại</Table.Th>
-                            <Table.Th>Vai trò</Table.Th>
-                            <Table.Th>Trạng thái</Table.Th>
-                            <Table.Th style={{ textAlign: 'center' }}>Thao tác</Table.Th>
+                            <Table.Th>Phone</Table.Th>
+                            <Table.Th>Role</Table.Th>
+                            <Table.Th>Status</Table.Th>
+                            <Table.Th style={{ textAlign: 'center' }}>Action</Table.Th>
                         </Table.Tr>
                     </Table.Thead>
                     <Table.Tbody>
                         {users.length > 0 ? (
-                            users.map((user) => (
+                            users.map((user, index) => (
                                 <Table.Tr key={user.id}>
+                                    <Table.Td>{(page - 1) * PAGE_SIZE + index + 1}</Table.Td>
                                     <Table.Td>{user.id}</Table.Td>
-                                    <Table.Td fw={500}>{user.fullName || 'Chưa cập nhật'}</Table.Td>
+                                    <Table.Td fw={500}>{user.fullName || 'Not updated'}</Table.Td>
                                     <Table.Td>{user.email}</Table.Td>
-                                    <Table.Td>{user.phoneNumber || 'Chưa cập nhật'}</Table.Td>
+                                    <Table.Td>{user.phoneNumber || 'Not updated'}</Table.Td>
                                     <Table.Td>
                                         <Badge color="violet" variant="light">{user.role}</Badge>
                                     </Table.Td>
@@ -171,12 +237,15 @@ export default function UserManagementPage() {
                                             <ActionIcon variant="subtle" color="blue" onClick={() => handleViewDetail(user)}>
                                                 <IconEye size={20} />
                                             </ActionIcon>
+                                            <ActionIcon variant="subtle" color="gray" onClick={() => handleEditUser(user)}>
+                                                <IconEdit size={20} />
+                                            </ActionIcon>
                                             <Switch
                                                 checked={user.isActive}
                                                 color="green"
                                                 onChange={() => handleToggleStatus(user)}
                                                 style={{ cursor: 'pointer' }}
-                                                title={user.isActive ? "Khóa tài khoản" : "Mở khóa tài khoản"}
+                                                title={user.isActive ? "Disable account" : "Unlock account"}
                                             />
                                         </Group>
                                     </Table.Td>
@@ -184,23 +253,63 @@ export default function UserManagementPage() {
                             ))
                         ) : (
                             <Table.Tr>
-                                <Table.Td colSpan={7} style={{ textAlign: 'center', padding: '2rem' }}>
-                                    <Text c="dimmed">Không tìm thấy người dùng nào phù hợp</Text>
+                                <Table.Td colSpan={8} style={{ textAlign: 'center', padding: '2rem' }}>
+                                    <Text c="dimmed">No users found</Text>
                                 </Table.Td>
                             </Table.Tr>
                         )}
                     </Table.Tbody>
                 </Table>
 
-                {/* --- PHÂN TRANG --- */}
-                {totalPages > 1 && (
-                    <Group justify="center" mt="xl">
-                        <Pagination total={totalPages} value={page} onChange={setPage} color="blue" withEdges />
+                {/* --- PAGINATION --- */}
+                {users.length > 0 && (
+                    <Group justify="space-between" align="center" mt="xl" spacing="md">
+                        <Group justify="center" align="center" spacing="md">
+                            <Button
+                                variant="outline"
+                                size="xs"
+                                disabled={page <= 1}
+                                onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
+                            >
+                                Previous
+                            </Button>
+                            <Pagination total={totalPages || 1} value={page} onChange={setPage} color="blue" withEdges />
+                            <Button
+                                variant="outline"
+                                size="xs"
+                                disabled={page >= (totalPages || 1)}
+                                onClick={() => setPage((prev) => Math.min(prev + 1, totalPages || 1))}
+                            >
+                                Next
+                            </Button>
+                        </Group>
+                        <Text size="sm" c="dimmed">
+                            Showing {users.length > 0 ? `${(page - 1) * PAGE_SIZE + 1} - ${Math.min(page * PAGE_SIZE, totalElements)}` : '0'} of {totalElements} users
+                        </Text>
                     </Group>
                 )}
             </Paper>
 
             {/* --- MODAL CHI TIẾT --- */}
+            <UserEditModal
+                opened={editOpened}
+                onClose={closeEdit}
+                user={selectedUser}
+                onSubmit={async (values) => {
+                    try {
+                        await userApi.updateUser(selectedUser.id, {
+                            fullName: values.fullName,
+                            phoneNumber: values.phoneNumber,
+                            identityCard: values.identityCard,
+                            active: values.isActive,
+                        });
+                        notifications.show({ title: 'Success', message: 'User updated successfully', color: 'green' });
+                        fetchUsers();
+                    } catch (error) {
+                        notifications.show({ title: 'Error', message: 'Failed to update user', color: 'red' });
+                    }
+                }}
+            />
             <UserDetailModal
                 opened={detailOpened}
                 onClose={closeDetail}

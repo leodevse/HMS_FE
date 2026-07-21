@@ -1,12 +1,12 @@
 // pages/staff/room/ListRoomPage.jsx
 import {
-    ActionIcon,
+    Anchor,
     Badge,
     Box,
     Button,
     Center,
-    Group,
     Divider,
+    Group,
     Modal,
     Pagination,
     Paper,
@@ -17,9 +17,8 @@ import {
     Text,
     TextInput,
     Title,
-    Tooltip,
 } from "@mantine/core";
-import {IconEye, IconSearch} from "@tabler/icons-react";
+import {IconSearch} from "@tabler/icons-react";
 import {useCallback, useEffect, useMemo, useState} from "react";
 import {roomApi} from "../../../apis/receptionist/roomApi.js";
 import {roomClassApi} from "../../../apis/receptionist/roomClassApi.js";
@@ -53,12 +52,12 @@ export const ListRoomPage = () => {
     const [selectedRoom, setSelectedRoom] = useState(null);
     const [detailLoading, setDetailLoading] = useState(false);
 
-    // --- Biến đổi dữ liệu cho Select (Fix lỗi toLowerCase bằng cách dùng .name) ---
+    // --- Biến đổi dữ liệu cho Select ---
     const roomClassOptions = useMemo(() => {
         if (!Array.isArray(roomClasses)) return [];
         return roomClasses.map((item) => ({
             value: String(item.id),
-            label: item.name || `Class ${item.id}`, // Sử dụng 'name' theo RoomClassResponse
+            label: item.name || `Class ${item.id}`,
         }));
     }, [roomClasses]);
 
@@ -75,7 +74,6 @@ export const ListRoomPage = () => {
     const fetchData = useCallback(async (rNum, stat, rcId, p) => {
         setLoading(true);
         try {
-            // Apply RoomSearchParams phẳng
             const params = {
                 roomNumber: rNum || undefined,
                 status: stat || undefined,
@@ -126,136 +124,164 @@ export const ListRoomPage = () => {
 
     return (
             <Box>
-                <Title order={2} fw={600} c="gray.8" mb="lg">Rooms Management</Title>
-
-                {/* Filter Section */}
-                <Group gap="sm" mb="md" wrap="wrap" align="flex-end">
-                    <TextInput
-                            label="Room Number"
-                            placeholder="E.g. 101"
-                            leftSection={<IconSearch size={15}/>}
-                            value={roomNumber}
-                            onChange={(e) => setRoomNumber(e.target.value)}
-                            onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                            radius="md" size="sm" style={{minWidth: 150}}
-                    />
-
-                    <Select
-                            label="Status"
-                            placeholder="All statuses"
-                            data={STATUS_OPTIONS}
-                            value={status}
-                            onChange={setStatus}
-                            clearable
-                            radius="md" size="sm" style={{minWidth: 150}}
-                    />
-
-                    <Select
-                            label="Room Class"
-                            placeholder="All classes"
-                            data={roomClassOptions}
-                            value={roomClassId}
-                            onChange={setRoomClassId}
-                            clearable
-                            searchable
-                            radius="md" size="sm" style={{minWidth: 180}}
-                    />
-
-                    <Button
-                            leftSection={<IconSearch size={15}/>}
-                            color="teal"
-                            radius="md" size="sm"
-                            loading={loading}
-                            onClick={handleSearch}
-                    >
-                        Search
-                    </Button>
+                <Group justify="space-between" align="center" mb="lg">
+                    <Title order={1} fw={700}>Manage Rooms</Title>
                 </Group>
 
-                {/* Table Section */}
-                <Paper radius="md" shadow="xs" withBorder
-                       style={{borderColor: "var(--mantine-color-gray-2)", overflowX: "auto"}}>
-                    <Table horizontalSpacing="md" verticalSpacing="sm" highlightOnHover
-                           styles={{
-                               thead: {backgroundColor: "var(--mantine-color-gray-0)"},
-                               th: {color: "var(--mantine-color-gray-6)", fontWeight: 500, fontSize: 13},
-                           }}>
-                        <Table.Thead>
-                            <Table.Tr>
-                                <Table.Th>Room No.</Table.Th>
-                                <Table.Th>Room Class</Table.Th>
-                                <Table.Th>Status</Table.Th>
-                                <Table.Th>Active</Table.Th>
-                                <Table.Th/>
-                            </Table.Tr>
-                        </Table.Thead>
-                        <Table.Tbody>
-                            {data.length > 0 ? data.map((room) => {
-                                const s = getStatus(room.status);
-                                return (
-                                        <Table.Tr key={room.id}>
-                                            <Table.Td>
-                                                <Text fw={600} size="sm">{room.roomNumber}</Text>
-                                            </Table.Td>
-                                            <Table.Td>
-                                                <Text size="sm">
-                                                    {room.roomClassName || room.roomClass?.className || room.roomClass?.name || "N/A"}
-                                                </Text>
-                                            </Table.Td>
-                                            <Table.Td>
-                                                <Badge color={s?.color ?? "gray"} variant="light" size="sm" radius="xl">
-                                                    {s?.label ?? room.status}
-                                                </Badge>
-                                            </Table.Td>
-                                            <Table.Td>
-                                                <Badge color={room.isActive ? "teal" : "gray"} variant="light" size="sm"
-                                                       radius="xl">
-                                                    {room.isActive ? "Active" : "Inactive"}
-                                                </Badge>
-                                            </Table.Td>
-                                            <Table.Td>
-                                                <Tooltip label="View detail">
-                                                    <ActionIcon variant="subtle" color="gray" size="sm"
-                                                                onClick={() => handleView(room)}>
-                                                        <IconEye size={15}/>
-                                                    </ActionIcon>
-                                                </Tooltip>
+                <Paper withBorder radius="md" p="lg">
+                    <Title order={4} mb="md">Room List Management</Title>
+
+                    {/* Filter Section */}
+                    <Group gap="sm" mb="md" wrap="wrap" align="flex-end">
+                        <TextInput
+                                placeholder="Search"
+                                leftSection={<IconSearch size={15}/>}
+                                value={roomNumber}
+                                onChange={(e) => setRoomNumber(e.target.value)}
+                                onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                                radius="md" size="sm"
+                                style={{flex: 1, minWidth: 200}}
+                        />
+
+                        <Select
+                                placeholder="Filter by Status"
+                                data={STATUS_OPTIONS}
+                                value={status}
+                                onChange={setStatus}
+                                clearable
+                                radius="md" size="sm" style={{minWidth: 160}}
+                        />
+
+                        <Select
+                                placeholder="Filter by Type"
+                                data={roomClassOptions}
+                                value={roomClassId}
+                                onChange={setRoomClassId}
+                                clearable
+                                searchable
+                                radius="md" size="sm" style={{minWidth: 160}}
+                        />
+
+                        <Button
+                                leftSection={<IconSearch size={15}/>}
+                                radius="md" size="sm"
+                                loading={loading}
+                                onClick={handleSearch}
+                        >
+                            Search
+                        </Button>
+                    </Group>
+
+                    <Divider mb="md"/>
+
+                    {/* Table Section */}
+                    <div style={{overflowX: "auto"}}>
+                        <Table highlightOnHover verticalSpacing="sm" horizontalSpacing="md" miw={750}
+                               styles={{
+                                   thead: {backgroundColor: "var(--mantine-color-gray-0)"},
+                                   th: {color: "var(--mantine-color-gray-6)", fontWeight: 700, fontSize: 12, letterSpacing: 1},
+                               }}>
+                            <Table.Thead>
+                                <Table.Tr>
+                                    <Table.Th>ROOM #</Table.Th>
+                                    <Table.Th>ROOM TYPE</Table.Th>
+                                    <Table.Th>FLOOR</Table.Th>
+                                    <Table.Th>STATUS</Table.Th>
+                                    <Table.Th>RATE PER NIGHT ($)</Table.Th>
+                                    <Table.Th>ACTION</Table.Th>
+                                </Table.Tr>
+                            </Table.Thead>
+                            <Table.Tbody>
+                                {data.length > 0 ? data.map((room) => {
+                                    const s = getStatus(room.status);
+                                    return (
+                                            <Table.Tr key={room.id}>
+                                                <Table.Td>
+                                                    <Text fw={600} size="sm">Room #{room.roomNumber}</Text>
+                                                </Table.Td>
+                                                <Table.Td>
+                                                    <Group gap={4} align="center">
+                                                        <span style={{fontSize: 16}}>🛏</span>
+                                                        <Text size="sm">
+                                                            {room.roomClassName || room.roomClass?.className || room.roomClass?.name || "N/A"}
+                                                        </Text>
+                                                    </Group>
+                                                </Table.Td>
+                                                <Table.Td>
+                                                    <Text size="sm" c="blue" fw={600}>{room.floor ?? '-'}</Text>
+                                                </Table.Td>
+                                                <Table.Td>
+                                                    <Badge color={s?.color ?? "gray"} variant="filled" size="sm" radius="sm">
+                                                        {s?.label ?? room.status}
+                                                    </Badge>
+                                                </Table.Td>
+                                                <Table.Td>
+                                                    <Text size="sm">
+                                                        {room.baseRate != null
+                                                            ? `$${Number(room.baseRate).toFixed(0)}`
+                                                            : room.roomClass?.basePrice != null
+                                                                ? `$${Number(room.roomClass.basePrice).toFixed(0)}`
+                                                                : '—'}
+                                                    </Text>
+                                                </Table.Td>
+                                                <Table.Td>
+                                                    <Group gap={4} wrap="nowrap">
+                                                        <Anchor
+                                                                size="sm"
+                                                                c="blue"
+                                                                fw={500}
+                                                                onClick={() => handleView(room)}
+                                                                style={{cursor: 'pointer'}}
+                                                        >
+                                                            View/Edit
+                                                        </Anchor>
+                                                        <Text size="sm" c="dimmed">|</Text>
+                                                        <Anchor
+                                                                size="sm"
+                                                                c="red"
+                                                                fw={500}
+                                                                style={{cursor: 'pointer'}}
+                                                        >
+                                                            Delete
+                                                        </Anchor>
+                                                    </Group>
+                                                </Table.Td>
+                                            </Table.Tr>
+                                    );
+                                }) : (
+                                        <Table.Tr>
+                                            <Table.Td colSpan={6}>
+                                                <Center py="xl">
+                                                    <Text c="dimmed" size="sm">
+                                                        {loading ? "Loading..." : "No rooms found matching criteria"}
+                                                    </Text>
+                                                </Center>
                                             </Table.Td>
                                         </Table.Tr>
-                                );
-                            }) : (
-                                    <Table.Tr>
-                                        <Table.Td colSpan={5}>
-                                            <Center py="xl">
-                                                <Text c="dimmed" size="sm">
-                                                    {loading ? "Loading..." : "No rooms found matching criteria"}
-                                                </Text>
-                                            </Center>
-                                        </Table.Td>
-                                    </Table.Tr>
-                            )}
-                        </Table.Tbody>
-                    </Table>
+                                )}
+                            </Table.Tbody>
+                        </Table>
+                    </div>
+
+                    {/* Pagination Section */}
+                    {total > 0 && (
+                            <Group justify="space-between" align="center" mt="md" wrap="wrap" gap="sm">
+                                <Text size="xs" c="dimmed">Showing {from}–{to} of {total} records</Text>
+                                {totalPages > 1 && (
+                                        <Pagination
+                                                value={page}
+                                                onChange={setPage}
+                                                total={totalPages}
+                                                radius="md"
+                                                size="sm"
+                                                withEdges
+                                        />
+                                )}
+                            </Group>
+                    )}
                 </Paper>
 
-                {/* Pagination Section */}
-                {total > 0 && (
-                        <Group justify="space-between" align="center" mt="md" wrap="wrap" gap="sm">
-                            <Text size="xs" c="dimmed">Showing {from}–{to} of {total} records</Text>
-                            {totalPages > 1 && (
-                                    <Pagination
-                                            value={page}
-                                            onChange={setPage}
-                                            total={totalPages}
-                                            color="teal"
-                                            radius="md"
-                                            size="sm"
-                                            withEdges
-                                    />
-                            )}
-                        </Group>
-                )}
-
+                {/* Room Detail Modal */}
                 <Modal
                         opened={Boolean(selectedRoom)}
                         onClose={() => setSelectedRoom(null)}
@@ -272,7 +298,7 @@ export const ListRoomPage = () => {
                                     </div>
                                     <Badge
                                             color={getStatus(selectedRoom.status)?.color ?? "gray"}
-                                            variant="light"
+                                            variant="filled"
                                             size="lg"
                                     >
                                         {getStatus(selectedRoom.status)?.label ?? selectedRoom.status}
@@ -285,8 +311,8 @@ export const ListRoomPage = () => {
                                         <Text fw={600}>{selectedRoom.roomClassName || "N/A"}</Text>
                                     </div>
                                     <div>
-                                        <Text size="xs" c="dimmed">Active</Text>
-                                        <Text fw={600}>{selectedRoom.isActive ? "Active" : "Inactive"}</Text>
+                                        <Text size="xs" c="dimmed">Floor</Text>
+                                        <Text fw={600}>{selectedRoom.floor ?? 'N/A'}</Text>
                                     </div>
                                     <div>
                                         <Text size="xs" c="dimmed">Standard capacity</Text>
@@ -299,8 +325,12 @@ export const ListRoomPage = () => {
                                     <div>
                                         <Text size="xs" c="dimmed">Base price</Text>
                                         <Text fw={600}>{selectedRoom.roomClass?.basePrice != null
-                                            ? `${Number(selectedRoom.roomClass.basePrice).toLocaleString("vi-VN")} ₫`
+                                            ? `$${Number(selectedRoom.roomClass.basePrice).toFixed(0)}`
                                             : "N/A"}</Text>
+                                    </div>
+                                    <div>
+                                        <Text size="xs" c="dimmed">Active</Text>
+                                        <Text fw={600}>{selectedRoom.isActive ? "Active" : "Inactive"}</Text>
                                     </div>
                                 </SimpleGrid>
                                 <div>
