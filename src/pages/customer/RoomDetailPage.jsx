@@ -534,12 +534,12 @@ export default function RoomDetailPage() {
                                     </Text>
                                     <Text c="dimmed" size="sm">/ night</Text>
                                 </Box>
-                                <Badge size="md" style={{ backgroundColor: '#e7f5ff', color: '#1971c2' }}>
+                                {/* <Badge size="md" style={{ backgroundColor: '#e7f5ff', color: '#1971c2' }}>
                                     ✓ Recommended
-                                </Badge>
+                                </Badge> */}
                             </Group>
 
-                            <Stack gap="sm" mb={20}>
+                            {/* <Stack gap="sm" mb={20}>
                                 <Group justify="space-between">
                                     <Text size="sm" c="dimmed">Standard Capacity</Text>
                                     <Text size="sm" fw={600}>{roomData.standardCapacity} guests</Text>
@@ -552,7 +552,8 @@ export default function RoomDetailPage() {
                                     <Text size="sm" c="dimmed">Extra person fee</Text>
                                     <Text size="sm" fw={600}>{formatPrice(roomData.extraPersonFee)}</Text>
                                 </Group>
-                            </Stack>
+                            </Stack> */}
+                            
 
                             <Button
                                 fullWidth
