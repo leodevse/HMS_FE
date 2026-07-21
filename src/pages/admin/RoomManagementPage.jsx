@@ -1,13 +1,12 @@
 import {useEffect, useMemo, useState} from 'react';
 import {
-    ActionIcon,
     Badge,
     Button,
     Divider,
     Group,
     Modal,
+    Pagination,
     Paper,
-    ScrollArea,
     Select,
     Stack,
     Table,
@@ -15,14 +14,18 @@ import {
     Textarea,
     TextInput,
     Title,
+    NumberInput,
+    Anchor,
 } from '@mantine/core';
 import {useForm} from '@mantine/form';
 import {modals} from '@mantine/modals';
 import {notifications} from '@mantine/notifications';
-import {IconEdit, IconEye, IconPlus, IconSearch, IconTrash,} from '@tabler/icons-react';
+import {IconPlus, IconSearch,} from '@tabler/icons-react';
 import {roomApi} from '../../apis/admin/roomApi';
 
-const roomStatusOptions = ['Available', 'Dirty', 'Occupied'];
+const PAGE_SIZE = 7;
+
+const roomStatusOptions = ['Available', 'Dirty', 'Occupied', 'Maintenance', 'Cleaning'];
 
 const statusColorMap = {
     Available: 'green',
@@ -31,11 +34,13 @@ const statusColorMap = {
     Dirty: 'yellow',
     Occupied: 'red',
     Maintenance: 'orange',
+    Cleaning: 'cyan',
 };
 
 const emptyRoomForm = {
     roomNumber: '',
     roomClassId: '',
+    floor: 1,
     status: 'Available',
     description: '',
 };
@@ -85,16 +90,25 @@ function RoomFormModal({opened, mode, onClose, onSubmit, initialValues, roomClas
                                 {...form.getInputProps('roomNumber')}
                         />
 
-                        <Select
-                                searchable
-                                label="Room Class"
-                                placeholder="Select room class"
-                                data={roomClassOptions}
-                                value={roomClassField.value || null}
-                                onChange={(value) => form.setFieldValue('roomClassId', value || '')}
-                                onBlur={roomClassField.onBlur}
-                                error={roomClassField.error}
-                        />
+                        <Group grow>
+                            <Select
+                                    searchable
+                                    label="Room Class"
+                                    placeholder="Select room class"
+                                    data={roomClassOptions}
+                                    value={roomClassField.value || null}
+                                    onChange={(value) => form.setFieldValue('roomClassId', value || '')}
+                                    onBlur={roomClassField.onBlur}
+                                    error={roomClassField.error}
+                            />
+                            <NumberInput
+                                    label="Floor"
+                                    min={1}
+                                    max={99}
+                                    allowDecimal={false}
+                                    {...form.getInputProps('floor')}
+                            />
+                        </Group>
 
                         <Select
                                 label="Status"
@@ -130,15 +144,27 @@ function RoomDetailsModal({opened, room, onClose}) {
     }
 
     return (
-            <Modal opened={opened} onClose={onClose} title={room.roomNumber} centered size="md">
+            <Modal opened={opened} onClose={onClose} title={`Room ${room.roomNumber} Details`} centered size="md">
                 <Stack gap="md">
+                    <Group justify="space-between">
+                        <Text fw={600}>Room Number</Text>
+                        <Text>{room.roomNumber || '-'}</Text>
+                    </Group>
                     <Group justify="space-between">
                         <Text fw={600}>Room Class</Text>
                         <Text>{room.roomClassName || '-'}</Text>
                     </Group>
                     <Group justify="space-between">
+                        <Text fw={600}>Floor</Text>
+                        <Text>{room.floor ?? '-'}</Text>
+                    </Group>
+                    <Group justify="space-between">
                         <Text fw={600}>Status</Text>
                         <Badge color={statusColorMap[room.status]} variant="light">{room.status}</Badge>
+                    </Group>
+                    <Group justify="space-between">
+                        <Text fw={600}>Rate per Night</Text>
+                        <Text>{room.baseRate != null ? `$${Number(room.baseRate).toLocaleString('en-US')}` : '-'}</Text>
                     </Group>
                     <div>
                         <Text fw={600} mb={4}>Description</Text>
@@ -159,6 +185,7 @@ export default function RoomManagementPage() {
     const [modalMode, setModalMode] = useState('create');
     const [formOpened, setFormOpened] = useState(false);
     const [detailsOpened, setDetailsOpened] = useState(false);
+    const [page, setPage] = useState(1);
 
     useEffect(() => {
         let ignore = false;
@@ -187,7 +214,7 @@ export default function RoomManagementPage() {
                     console.error('Error isLoading room classes:', error);
                     notifications.show({
                         color: 'yellow',
-                        message: getApiErrorMessage(error, 'Room classes are temporarily unavailable. Please check Room Types setup.'),
+                        message: getApiErrorMessage(error, 'Room classes are temporarily unavailable.'),
                     });
                 });
 
@@ -217,12 +244,8 @@ export default function RoomManagementPage() {
         return matchesQuery && matchesStatus && matchesClass;
     });
 
-    const roomStats = {
-        total: rooms.length,
-        available: rooms.filter((room) => room.status === 'Available').length,
-        occupied: rooms.filter((room) => room.status === 'Occupied').length,
-        maintenance: rooms.filter((room) => room.status === 'Maintenance').length,
-    };
+    const totalPages = Math.ceil(filteredRooms.length / PAGE_SIZE);
+    const pagedRooms = filteredRooms.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
     const openCreateModal = () => {
         setModalMode('create');
@@ -325,122 +348,135 @@ export default function RoomManagementPage() {
                 <Group justify="space-between" align="center">
                     <div>
                         <Title order={1}>Manage Rooms</Title>
-                        <Text c="dimmed" mt={4}>Room management synced with database schema.</Text>
                     </div>
 
                     <Button leftSection={<IconPlus size={16}/>} onClick={openCreateModal}>
-                        Add New Room
+                        + Add New Room
                     </Button>
                 </Group>
 
-                <Group>
-                    <Badge size="lg" variant="light" color="blue">Total: {roomStats.total}</Badge>
-                    <Badge size="lg" variant="light" color="green">Available: {roomStats.available}</Badge>
-                    <Badge size="lg" variant="light" color="red">Occupied: {roomStats.occupied}</Badge>
-                    <Badge size="lg" variant="light" color="orange">Maintenance: {roomStats.maintenance}</Badge>
-                </Group>
+                <Paper withBorder radius="md" p="lg">
+                    <Title order={4} mb="md">Room List Management</Title>
 
-                <Paper withBorder radius="lg" p="lg">
-                    <Stack gap="lg">
-                        <div>
-                            <Title order={2}>Room List</Title>
-                            <Text c="dimmed" mt={4}>Search and filter by room number, class, status.</Text>
-                        </div>
+                    <Group mb="md" align="flex-end">
+                        <TextInput
+                                placeholder="Search"
+                                leftSection={<IconSearch size={16}/>}
+                                value={searchValue}
+                                onChange={(event) => setSearchValue(event.currentTarget.value)}
+                                style={{flex: 1, minWidth: 200}}
+                        />
+                        <Select
+                                clearable
+                                placeholder="Filter by Status"
+                                data={roomStatusOptions}
+                                value={statusFilter}
+                                onChange={(v) => { setStatusFilter(v); setPage(1); }}
+                                style={{minWidth: 160}}
+                        />
+                        <Select
+                                clearable
+                                placeholder="Filter by Type"
+                                data={roomClassOptions}
+                                value={classFilter}
+                                onChange={(v) => { setClassFilter(v); setPage(1); }}
+                                style={{minWidth: 160}}
+                        />
+                    </Group>
 
-                        <Group align="end" grow>
-                            <TextInput
-                                    label="Search"
-                                    placeholder="Search room number, class or description"
-                                    leftSection={<IconSearch size={16}/>}
-                                    value={searchValue}
-                                    onChange={(event) => setSearchValue(event.currentTarget.value)}
-                            />
-                            <Select
-                                    clearable
-                                    label="Filter by Status"
-                                    placeholder="All statuses"
-                                    data={roomStatusOptions}
-                                    value={statusFilter}
-                                    onChange={setStatusFilter}
-                            />
-                            <Select
-                                    clearable
-                                    label="Filter by Room Class"
-                                    placeholder="All room classes"
-                                    data={roomClassOptions}
-                                    value={classFilter}
-                                    onChange={setClassFilter}
+                    <Divider mb="md"/>
+
+                    <div style={{overflowX: 'auto'}}>
+                        <Table highlightOnHover verticalSpacing="sm" horizontalSpacing="md" miw={800}>
+                            <Table.Thead>
+                                <Table.Tr>
+                                    <Table.Th style={{fontWeight: 700, fontSize: 12, letterSpacing: 1, color: '#888'}}>ROOM #</Table.Th>
+                                    <Table.Th style={{fontWeight: 700, fontSize: 12, letterSpacing: 1, color: '#888'}}>ROOM TYPE</Table.Th>
+                                    <Table.Th style={{fontWeight: 700, fontSize: 12, letterSpacing: 1, color: '#888'}}>FLOOR</Table.Th>
+                                    <Table.Th style={{fontWeight: 700, fontSize: 12, letterSpacing: 1, color: '#888'}}>STATUS</Table.Th>
+                                    <Table.Th style={{fontWeight: 700, fontSize: 12, letterSpacing: 1, color: '#888'}}>RATE PER NIGHT ($)</Table.Th>
+                                    <Table.Th style={{fontWeight: 700, fontSize: 12, letterSpacing: 1, color: '#888'}}>ACTION</Table.Th>
+                                </Table.Tr>
+                            </Table.Thead>
+                            <Table.Tbody>
+                                {pagedRooms.length > 0 ? pagedRooms.map((room) => (
+                                        <Table.Tr key={room.id}>
+                                            <Table.Td fw={600}>Room #{room.roomNumber}</Table.Td>
+                                            <Table.Td>
+                                                <Group gap={4} align="center">
+                                                    <span style={{fontSize: 16}}>🛏</span>
+                                                    <Text size="sm">{room.roomClassName || '-'}</Text>
+                                                </Group>
+                                            </Table.Td>
+                                            <Table.Td>
+                                                <Text size="sm" c="blue" fw={600}>{room.floor ?? '-'}</Text>
+                                            </Table.Td>
+                                            <Table.Td>
+                                                <Badge color={statusColorMap[room.status] || 'gray'} variant="filled" size="sm" radius="sm">
+                                                    {room.status}
+                                                </Badge>
+                                            </Table.Td>
+                                            <Table.Td>
+                                                <Text size="sm">{room.baseRate != null ? `$${Number(room.baseRate).toLocaleString('en-US')}` : '—'}</Text>
+                                            </Table.Td>
+                                            <Table.Td>
+                                                <Group gap={4} wrap="nowrap">
+                                                    <Anchor
+                                                            size="sm"
+                                                            c="blue"
+                                                            fw={500}
+                                                            onClick={() => openEditModal(room)}
+                                                            style={{cursor: 'pointer'}}
+                                                    >
+                                                        Edit
+                                                    </Anchor>
+                                                    <Text size="sm" c="dimmed">|</Text>
+                                                    <Anchor
+                                                            size="sm"
+                                                            c="blue"
+                                                            fw={500}
+                                                            onClick={() => openDetailsModal(room)}
+                                                            style={{cursor: 'pointer'}}
+                                                    >
+                                                        View
+                                                    </Anchor>
+                                                    <Text size="sm" c="dimmed">|</Text>
+                                                    <Anchor
+                                                            size="sm"
+                                                            c="red"
+                                                            fw={500}
+                                                            onClick={() => handleDelete(room)}
+                                                            style={{cursor: 'pointer'}}
+                                                    >
+                                                        Delete
+                                                    </Anchor>
+                                                </Group>
+                                            </Table.Td>
+                                        </Table.Tr>
+                                )) : (
+                                        <Table.Tr>
+                                            <Table.Td colSpan={6}>
+                                                <Text ta="center" py="lg" c="dimmed">
+                                                    No rooms matched the current filters.
+                                                </Text>
+                                            </Table.Td>
+                                        </Table.Tr>
+                                )}
+                            </Table.Tbody>
+                        </Table>
+                    </div>
+
+                    {totalPages > 1 && (
+                        <Group justify="flex-end" mt="md">
+                            <Pagination
+                                value={page}
+                                onChange={setPage}
+                                total={totalPages}
+                                size="sm"
+                                withEdges
                             />
                         </Group>
-
-                        <Divider/>
-
-                        <ScrollArea>
-                            <Table highlightOnHover verticalSpacing="md" miw={900}>
-                                <Table.Thead>
-                                    <Table.Tr>
-                                        <Table.Th>Room</Table.Th>
-                                        <Table.Th>Room Class</Table.Th>
-                                        <Table.Th>Status</Table.Th>
-                                        <Table.Th>Description</Table.Th>
-                                        <Table.Th>Action</Table.Th>
-                                    </Table.Tr>
-                                </Table.Thead>
-                                <Table.Tbody>
-                                    {filteredRooms.length > 0 ? filteredRooms.map((room) => (
-                                            <Table.Tr key={room.id}>
-                                                <Table.Td fw={600}>{room.roomNumber}</Table.Td>
-                                                <Table.Td>{room.roomClassName || '-'}</Table.Td>
-                                                <Table.Td>
-                                                    <Badge color={statusColorMap[room.status]} variant="light">
-                                                        {room.status}
-                                                    </Badge>
-                                                </Table.Td>
-                                                <Table.Td maw={320}>
-                                                    <Text size="sm" lineClamp={2}>{room.description || '-'}</Text>
-                                                </Table.Td>
-                                                <Table.Td>
-                                                    <Group gap="xs" wrap="nowrap">
-                                                        <ActionIcon
-                                                                variant="subtle"
-                                                                color="blue"
-                                                                onClick={() => openDetailsModal(room)}
-                                                                aria-label={`View ${room.roomNumber}`}
-                                                        >
-                                                            <IconEye size={18}/>
-                                                        </ActionIcon>
-                                                        <ActionIcon
-                                                                variant="subtle"
-                                                                color="dark"
-                                                                onClick={() => openEditModal(room)}
-                                                                aria-label={`Edit ${room.roomNumber}`}
-                                                        >
-                                                            <IconEdit size={18}/>
-                                                        </ActionIcon>
-                                                        <ActionIcon
-                                                                variant="subtle"
-                                                                color="red"
-                                                                onClick={() => handleDelete(room)}
-                                                                aria-label={`Delete ${room.roomNumber}`}
-                                                        >
-                                                            <IconTrash size={18}/>
-                                                        </ActionIcon>
-                                                    </Group>
-                                                </Table.Td>
-                                            </Table.Tr>
-                                    )) : (
-                                            <Table.Tr>
-                                                <Table.Td colSpan={5}>
-                                                    <Text ta="center" py="lg" c="dimmed">
-                                                        No rooms matched the current filters.
-                                                    </Text>
-                                                </Table.Td>
-                                            </Table.Tr>
-                                    )}
-                                </Table.Tbody>
-                            </Table>
-                        </ScrollArea>
-                    </Stack>
+                    )}
                 </Paper>
 
                 <RoomFormModal
@@ -456,7 +492,10 @@ export default function RoomManagementPage() {
                 <RoomDetailsModal
                         opened={detailsOpened}
                         room={selectedRoom && selectedRoom.id ? selectedRoom : null}
-                        onClose={() => setDetailsOpened(false)}
+                        onClose={() => {
+                            setDetailsOpened(false);
+                            // Open edit if user clicks View/Edit
+                        }}
                 />
             </Stack>
     );

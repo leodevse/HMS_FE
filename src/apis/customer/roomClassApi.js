@@ -9,6 +9,10 @@ const toCustomerRoomClass = (item, totalRooms = 0) => ({
     standardCapacity: Number(item.standardOccupancy || 1),
     maxCapacity: Number(item.maxOccupancy || 2),
     extraPersonFee: Number(item.extraPersonFee || 0),
+    amenities: Array.isArray(item.amenities) ? item.amenities : [],
+    assets: Array.isArray(item.amenities)
+        ? item.amenities.map((name, index) => ({ id: `${item.id}-${index}`, name }))
+        : [],
     totalRooms,
 });
 

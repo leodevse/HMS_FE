@@ -1,23 +1,29 @@
 import {useEffect, useState} from 'react';
 import {
-    ActionIcon,
+    Anchor,
+    Badge,
     Button,
+    Divider,
     Group,
     Modal,
+    MultiSelect,
     NumberInput,
+    Pagination,
     Paper,
-    ScrollArea,
     Stack,
     Table,
     Text,
     TextInput,
     Title,
+    Tooltip,
 } from '@mantine/core';
 import {useForm} from '@mantine/form';
 import {modals} from '@mantine/modals';
 import {notifications} from '@mantine/notifications';
-import {IconEdit, IconEye, IconPlus, IconSearch, IconTrash,} from '@tabler/icons-react';
+import {IconPlus, IconSearch} from '@tabler/icons-react';
 import {roomTypeApi} from '../../apis/admin/roomTypeApi';
+
+const PAGE_SIZE = 7;
 
 const emptyRoomType = {
     name: '',
@@ -25,15 +31,38 @@ const emptyRoomType = {
     maxOccupancy: 2,
     baseRate: 90,
     extraPersonFee: 0,
+    amenities: [],
 };
 
-const currencyFormatter = new Intl.NumberFormat('vi-VN', {
+const AMENITY_OPTIONS = [
+    {value: 'wifi', label: 'WiFi', emoji: '📶'},
+    {value: 'tv', label: 'TV', emoji: '📺'},
+    {value: 'ac', label: 'A/C', emoji: '❄️'},
+    {value: 'bath', label: 'Bath', emoji: '🛁'},
+    {value: 'pool', label: 'Pool Access', emoji: '🏊'},
+    {value: 'minibar', label: 'Mini bar', emoji: '🍹'},
+    {value: 'gym', label: 'Gym Access', emoji: '🏋️'},
+    {value: 'parking', label: 'Parking', emoji: '🅿️'},
+];
+
+const amenityColors = {
+    wifi: 'green',
+    tv: 'blue',
+    ac: 'cyan',
+    bath: 'teal',
+    pool: 'indigo',
+    minibar: 'grape',
+    gym: 'orange',
+    parking: 'gray',
+};
+
+const currencyFormatter = new Intl.NumberFormat('en-US', {
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
 });
 
 function formatPrice(value) {
-    return `${currencyFormatter.format(Number(value) || 0)} đ`;
+    return `$${currencyFormatter.format(Number(value) || 0)}`;
 }
 
 function getApiErrorMessage(error, fallbackMessage) {
@@ -51,7 +80,7 @@ function RoomTypeFormModal({opened, mode, initialValues, onClose, onSubmit}) {
             name: (value) => (value.trim().length < 2 ? 'Type name is required' : null),
             standardOccupancy: (value) => (value < 1 ? 'Standard occupancy must be at least 1' : null),
             maxOccupancy: (value, values) => (
-                    value < values.standardOccupancy ? 'Max occupancy must be greater than or equal to standard occupancy' : null
+                    value < values.standardOccupancy ? 'Max occupancy must be >= standard occupancy' : null
             ),
             baseRate: (value) => (value <= 0 ? 'Base rate must be greater than 0' : null),
             extraPersonFee: (value) => (value < 0 ? 'Extra person fee cannot be negative' : null),
@@ -78,7 +107,7 @@ function RoomTypeFormModal({opened, mode, initialValues, onClose, onSubmit}) {
                     <Stack>
                         <TextInput
                                 label="Type Name"
-                                placeholder="Deluxe"
+                                placeholder="e.g. Deluxe"
                                 {...form.getInputProps('name')}
                         />
 
@@ -96,7 +125,7 @@ function RoomTypeFormModal({opened, mode, initialValues, onClose, onSubmit}) {
                                     {...form.getInputProps('maxOccupancy')}
                             />
                             <NumberInput
-                                    label="Base Rate per Night (đ)"
+                                    label="Base Rate per Night ($)"
                                     min={1}
                                     decimalScale={2}
                                     fixedDecimalScale
@@ -106,12 +135,19 @@ function RoomTypeFormModal({opened, mode, initialValues, onClose, onSubmit}) {
                         </Group>
 
                         <NumberInput
-                                label="Extra Person Fee (đ)"
+                                label="Extra Person Fee ($)"
                                 min={0}
                                 decimalScale={2}
                                 fixedDecimalScale
                                 thousandSeparator=","
                                 {...form.getInputProps('extraPersonFee')}
+                        />
+
+                        <MultiSelect
+                                label="Amenities"
+                                placeholder="Select amenities"
+                                data={AMENITY_OPTIONS.map((a) => ({value: a.value, label: `${a.emoji} ${a.label}`}))}
+                                {...form.getInputProps('amenities')}
                         />
 
                         <Group justify="flex-end">
@@ -148,8 +184,50 @@ function RoomTypeDetailsModal({opened, roomType, onClose}) {
                         <Text fw={600}>Extra Person Fee</Text>
                         <Text>{formatPrice(roomType.extraPersonFee)}</Text>
                     </Group>
+                    <Stack gap="xs">
+                        <Text fw={600}>Amenities</Text>
+                        <Group gap="xs">
+                            {(roomType.amenities || []).length > 0 ? (
+                                    roomType.amenities.map((a) => {
+                                        const opt = AMENITY_OPTIONS.find((o) => o.value === a);
+                                        return opt ? (
+                                                <Badge key={a} color={amenityColors[a] || 'blue'} variant="light">
+                                                    {opt.emoji} {opt.label}
+                                                </Badge>
+                                        ) : (
+                                                <Badge key={a} color="gray" variant="light">{a}</Badge>
+                                        );
+                                    })
+                            ) : (
+                                    <Text c="dimmed" size="sm">No amenities</Text>
+                            )}
+                        </Group>
+                    </Stack>
                 </Stack>
             </Modal>
+    );
+}
+
+function AmenitiesBadges({amenities}) {
+    if (!amenities || amenities.length === 0) return <Text size="sm" c="dimmed">—</Text>;
+    return (
+            <Group gap={4} wrap="wrap">
+                {amenities.map((a) => {
+                    const opt = AMENITY_OPTIONS.find((o) => o.value === a);
+                    return (
+                            <Tooltip key={a} label={opt?.label || a} withArrow>
+                                <Badge
+                                        color={amenityColors[a] || 'blue'}
+                                        variant="light"
+                                        size="sm"
+                                        style={{cursor: 'default'}}
+                                >
+                                    {opt?.emoji || a}
+                                </Badge>
+                            </Tooltip>
+                    );
+                })}
+            </Group>
     );
 }
 
@@ -160,6 +238,7 @@ export default function RoomTypesPage() {
     const [modalMode, setModalMode] = useState('create');
     const [formOpened, setFormOpened] = useState(false);
     const [detailsOpened, setDetailsOpened] = useState(false);
+    const [page, setPage] = useState(1);
 
     useEffect(() => {
         let ignore = false;
@@ -188,9 +267,11 @@ export default function RoomTypesPage() {
         if (!query) {
             return true;
         }
-
         return roomType.name.toLowerCase().includes(query);
     });
+
+    const totalPages = Math.ceil(filteredRoomTypes.length / PAGE_SIZE);
+    const pagedRoomTypes = filteredRoomTypes.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
     const openCreateModal = () => {
         setModalMode('create');
@@ -200,13 +281,8 @@ export default function RoomTypesPage() {
 
     const openEditModal = (roomType) => {
         setModalMode('edit');
-        setSelectedRoomType(roomType);
+        setSelectedRoomType({...emptyRoomType, ...roomType});
         setFormOpened(true);
-    };
-
-    const openDetailsModal = (roomType) => {
-        setSelectedRoomType(roomType);
-        setDetailsOpened(true);
     };
 
     const handleSubmit = (values) => {
@@ -216,6 +292,7 @@ export default function RoomTypesPage() {
             maxOccupancy: Number(values.maxOccupancy),
             baseRate: Number(values.baseRate),
             extraPersonFee: Number(values.extraPersonFee || 0),
+            amenities: values.amenities || [],
         };
 
         if (modalMode === 'create') {
@@ -239,7 +316,7 @@ export default function RoomTypesPage() {
                 .then((updated) => {
                     setRoomTypes((currentRoomTypes) => currentRoomTypes.map((roomType) => (
                             roomType.id === selectedRoomType.id
-                                    ? updated
+                                    ? {...updated, amenities: normalizedValues.amenities}
                                     : roomType
                     )));
                     notifications.show({color: 'green', message: 'Room type updated in database.'});
@@ -283,80 +360,95 @@ export default function RoomTypesPage() {
                 <Group justify="space-between" align="center">
                     <Title order={1}>Room Types</Title>
                     <Button leftSection={<IconPlus size={16}/>} onClick={openCreateModal}>
-                        Add New Room Type
+                        + Add New Room Type
                     </Button>
                 </Group>
 
-                <Paper withBorder radius="lg" p="lg">
-                    <Stack gap="lg">
-                        <TextInput
-                                placeholder="Search"
-                                leftSection={<IconSearch size={16}/>}
-                                value={searchValue}
-                                onChange={(event) => setSearchValue(event.currentTarget.value)}
-                                maw={460}
-                        />
+                <Paper withBorder radius="md" p="lg">
+                    <TextInput
+                            placeholder="Search"
+                            leftSection={<IconSearch size={16}/>}
+                            value={searchValue}
+                            onChange={(event) => {
+                                setSearchValue(event.currentTarget.value);
+                                setPage(1);
+                            }}
+                            maw={460}
+                            mb="md"
+                    />
 
-                        <ScrollArea>
-                            <Table highlightOnHover verticalSpacing="lg" miw={980}>
-                                <Table.Thead>
-                                    <Table.Tr>
-                                        <Table.Th>Type Name</Table.Th>
-                                        <Table.Th>Standard Occupancy</Table.Th>
-                                        <Table.Th>Max Occupancy</Table.Th>
-                                        <Table.Th>Base Rate per Night (đ)</Table.Th>
-                                        <Table.Th>Action</Table.Th>
-                                    </Table.Tr>
-                                </Table.Thead>
-                                <Table.Tbody>
-                                    {filteredRoomTypes.length > 0 ? filteredRoomTypes.map((roomType) => (
-                                            <Table.Tr key={roomType.id}>
-                                                <Table.Td fw={600}>{roomType.name}</Table.Td>
-                                                <Table.Td>{roomType.standardOccupancy}</Table.Td>
-                                                <Table.Td>{roomType.maxOccupancy}</Table.Td>
-                                                <Table.Td>{formatPrice(roomType.baseRate)}</Table.Td>
-                                                <Table.Td>
-                                                    <Group gap="xs" wrap="nowrap">
-                                                        <ActionIcon
-                                                                variant="subtle"
-                                                                color="blue"
-                                                                onClick={() => openDetailsModal(roomType)}
-                                                                aria-label={`View ${roomType.name}`}
-                                                        >
-                                                            <IconEye size={18}/>
-                                                        </ActionIcon>
-                                                        <ActionIcon
-                                                                variant="subtle"
-                                                                color="dark"
-                                                                onClick={() => openEditModal(roomType)}
-                                                                aria-label={`Edit ${roomType.name}`}
-                                                        >
-                                                            <IconEdit size={18}/>
-                                                        </ActionIcon>
-                                                        <ActionIcon
-                                                                variant="subtle"
-                                                                color="red"
-                                                                onClick={() => handleDelete(roomType)}
-                                                                aria-label={`Delete ${roomType.name}`}
-                                                        >
-                                                            <IconTrash size={18}/>
-                                                        </ActionIcon>
-                                                    </Group>
-                                                </Table.Td>
-                                            </Table.Tr>
-                                    )) : (
-                                            <Table.Tr>
-                                                <Table.Td colSpan={5}>
-                                                    <Text ta="center" py="lg" c="dimmed">
-                                                        No room types matched the current search.
-                                                    </Text>
-                                                </Table.Td>
-                                            </Table.Tr>
-                                    )}
-                                </Table.Tbody>
-                            </Table>
-                        </ScrollArea>
-                    </Stack>
+                    <Divider mb="md"/>
+
+                    <div style={{overflowX: 'auto'}}>
+                        <Table highlightOnHover verticalSpacing="lg" horizontalSpacing="md" miw={900}>
+                            <Table.Thead>
+                                <Table.Tr>
+                                    <Table.Th style={{fontWeight: 700, fontSize: 12, letterSpacing: 1, color: '#888'}}>TYPE NAME</Table.Th>
+                                    <Table.Th style={{fontWeight: 700, fontSize: 12, letterSpacing: 1, color: '#888'}}>STANDARD OCCUPANCY</Table.Th>
+                                    <Table.Th style={{fontWeight: 700, fontSize: 12, letterSpacing: 1, color: '#888'}}>MAX OCCUPANCY</Table.Th>
+                                    <Table.Th style={{fontWeight: 700, fontSize: 12, letterSpacing: 1, color: '#888'}}>BASE RATE PER NIGHT ($)</Table.Th>
+                                    <Table.Th style={{fontWeight: 700, fontSize: 12, letterSpacing: 1, color: '#888'}}>AMENITIES</Table.Th>
+                                    <Table.Th style={{fontWeight: 700, fontSize: 12, letterSpacing: 1, color: '#888'}}>ACTION</Table.Th>
+                                </Table.Tr>
+                            </Table.Thead>
+                            <Table.Tbody>
+                                {pagedRoomTypes.length > 0 ? pagedRoomTypes.map((roomType) => (
+                                        <Table.Tr key={roomType.id}>
+                                            <Table.Td fw={600}>{roomType.name}</Table.Td>
+                                            <Table.Td>{roomType.standardOccupancy}</Table.Td>
+                                            <Table.Td c="red" fw={600}>{roomType.maxOccupancy}</Table.Td>
+                                            <Table.Td fw={600}>{formatPrice(roomType.baseRate)}</Table.Td>
+                                            <Table.Td>
+                                                <AmenitiesBadges amenities={roomType.amenities}/>
+                                            </Table.Td>
+                                            <Table.Td>
+                                                <Group gap={4} wrap="nowrap">
+                                                    <Anchor
+                                                            size="sm"
+                                                            c="blue"
+                                                            fw={500}
+                                                            onClick={() => openEditModal(roomType)}
+                                                            style={{cursor: 'pointer'}}
+                                                    >
+                                                        View/Edit
+                                                    </Anchor>
+                                                    <Text size="sm" c="dimmed">|</Text>
+                                                    <Anchor
+                                                            size="sm"
+                                                            c="red"
+                                                            fw={500}
+                                                            onClick={() => handleDelete(roomType)}
+                                                            style={{cursor: 'pointer'}}
+                                                    >
+                                                        Delete
+                                                    </Anchor>
+                                                </Group>
+                                            </Table.Td>
+                                        </Table.Tr>
+                                )) : (
+                                        <Table.Tr>
+                                            <Table.Td colSpan={6}>
+                                                <Text ta="center" py="lg" c="dimmed">
+                                                    No room types matched the current search.
+                                                </Text>
+                                            </Table.Td>
+                                        </Table.Tr>
+                                )}
+                            </Table.Tbody>
+                        </Table>
+                    </div>
+
+                    {totalPages > 1 && (
+                            <Group justify="flex-end" mt="md">
+                                <Pagination
+                                        value={page}
+                                        onChange={setPage}
+                                        total={totalPages}
+                                        size="sm"
+                                        withEdges
+                                />
+                            </Group>
+                    )}
                 </Paper>
 
                 <RoomTypeFormModal

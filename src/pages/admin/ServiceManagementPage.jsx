@@ -8,6 +8,7 @@ import {
     Modal,
     NumberInput,
     Paper,
+    Pagination,
     ScrollArea,
     Select,
     Stack,
@@ -42,6 +43,8 @@ const emptyService = {
     serviceCategory: 'Spa',
     price: 0,
     description: '',
+    duration: '',
+    availability: 'Yes',
 };
 
 const currencyFormatter = new Intl.NumberFormat('vi-VN', {
@@ -68,6 +71,8 @@ function ServiceFormModal({opened, mode, initialValues, onClose, onSubmit}) {
             name: (value) => (value.trim().length < 2 ? 'Service name is required' : null),
             serviceCategory: (value) => (!value ? 'Category is required' : null),
             price: (value) => (value <= 0 ? 'Price must be greater than 0' : null),
+            duration: (value) => (value.trim().length < 1 ? 'Duration is required' : null),
+            availability: (value) => (!value ? 'Availability is required' : null),
         },
     });
 
@@ -110,6 +115,19 @@ function ServiceFormModal({opened, mode, initialValues, onClose, onSubmit}) {
                                 thousandSeparator=","
                                 {...form.getInputProps('price')}
                         />
+
+                        <Group grow align="start">
+                            <TextInput
+                                    label="Duration"
+                                    placeholder="e.g. 30 minutes"
+                                    {...form.getInputProps('duration')}
+                            />
+                            <Select
+                                    label="Availability"
+                                    data={['Yes', 'No']}
+                                    {...form.getInputProps('availability')}
+                            />
+                        </Group>
 
                         <Textarea
                                 label="Description"
@@ -157,6 +175,14 @@ function ServiceDetailsModal({opened, service, onClose}) {
                         <Text>{formatPrice(service.price)}</Text>
                     </Group>
                     <Group justify="space-between">
+                        <Text fw={600}>Duration</Text>
+                        <Text>{service.duration || '-'}</Text>
+                    </Group>
+                    <Group justify="space-between">
+                        <Text fw={600}>Availability</Text>
+                        <Text>{service.availability || '-'}</Text>
+                    </Group>
+                    <Group justify="space-between">
                         <Text fw={600}>Service ID</Text>
                         <Text>{service.id}</Text>
                     </Group>
@@ -170,9 +196,11 @@ function ServiceDetailsModal({opened, service, onClose}) {
 }
 
 export default function ServiceManagementPage() {
+    const PAGE_SIZE = 8;
     const [services, setServices] = useState([]);
     const [searchValue, setSearchValue] = useState('');
     const [categoryFilter, setCategoryFilter] = useState(null);
+    const [page, setPage] = useState(1);
     const [selectedService, setSelectedService] = useState(null);
     const [modalMode, setModalMode] = useState('create');
     const [formOpened, setFormOpened] = useState(false);
@@ -210,11 +238,21 @@ export default function ServiceManagementPage() {
         return matchesQuery && matchesCategory;
     });
 
+    const totalServicePages = Math.max(1, Math.ceil(filteredServices.length / PAGE_SIZE));
+    const paginatedServices = filteredServices.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
     const openCreateModal = () => {
         setModalMode('create');
         setSelectedService({...emptyService});
         setFormOpened(true);
     };
+
+    useEffect(() => {
+        const pageCount = Math.max(1, Math.ceil(filteredServices.length / PAGE_SIZE));
+        if (page > pageCount) {
+            setPage(pageCount);
+        }
+    }, [filteredServices.length, page]);
 
     const openEditModal = (service) => {
         setModalMode('edit');
@@ -340,13 +378,16 @@ export default function ServiceManagementPage() {
                                 <Table.Thead>
                                     <Table.Tr>
                                         <Table.Th>Service Name</Table.Th>
-                                        <Table.Th>Category</Table.Th>
+                                        <Table.Th>Type</Table.Th>
+                                        <Table.Th>Description</Table.Th>
                                         <Table.Th>Price (đ)</Table.Th>
+                                        <Table.Th>Duration</Table.Th>
+                                        <Table.Th>Availability</Table.Th>
                                         <Table.Th>Action</Table.Th>
                                     </Table.Tr>
                                 </Table.Thead>
                                 <Table.Tbody>
-                                    {filteredServices.length > 0 ? filteredServices.map((service) => {
+                                    {paginatedServices.length > 0 ? paginatedServices.map((service) => {
                                         const CategoryIcon = categoryIconMap[service.serviceCategory] || IconToolsKitchen2;
 
                                         return (
@@ -361,40 +402,28 @@ export default function ServiceManagementPage() {
                                                             {service.serviceCategory}
                                                         </Badge>
                                                     </Table.Td>
+                                                    <Table.Td>{service.description || '-'}</Table.Td>
                                                     <Table.Td>{formatPrice(service.price)}</Table.Td>
+                                                    <Table.Td>{service.duration || '-'}</Table.Td>
+                                                    <Table.Td>{service.availability}</Table.Td>
                                                     <Table.Td>
-                                                        <Group gap="xs" wrap="nowrap">
-                                                            <ActionIcon
-                                                                    variant="subtle"
-                                                                    color="blue"
-                                                                    onClick={() => openDetailsModal(service)}
-                                                                    aria-label={`View ${service.name}`}
-                                                            >
-                                                                <IconEye size={18}/>
-                                                            </ActionIcon>
-                                                            <ActionIcon
-                                                                    variant="subtle"
-                                                                    color="dark"
-                                                                    onClick={() => openEditModal(service)}
-                                                                    aria-label={`Edit ${service.name}`}
-                                                            >
-                                                                <IconEdit size={18}/>
-                                                            </ActionIcon>
-                                                            <ActionIcon
-                                                                    variant="subtle"
-                                                                    color="red"
-                                                                    onClick={() => handleDelete(service)}
-                                                                    aria-label={`Delete ${service.name}`}
-                                                            >
-                                                                <IconTrash size={18}/>
-                                                            </ActionIcon>
+                                                        <Group spacing="xs" wrap="nowrap">
+                                                            <Button size="xs" variant="subtle" onClick={() => openDetailsModal(service)}>
+                                                                View
+                                                            </Button>
+                                                            <Button size="xs" variant="subtle" onClick={() => openEditModal(service)}>
+                                                                Edit
+                                                            </Button>
+                                                            <Button size="xs" variant="outline" color="red" onClick={() => handleDelete(service)}>
+                                                                Delete
+                                                            </Button>
                                                         </Group>
                                                     </Table.Td>
                                                 </Table.Tr>
                                         );
                                     }) : (
                                             <Table.Tr>
-                                                <Table.Td colSpan={4}>
+                                                <Table.Td colSpan={7}>
                                                     <Text ta="center" py="lg" c="dimmed">
                                                         No services matched the current search.
                                                     </Text>
@@ -404,6 +433,10 @@ export default function ServiceManagementPage() {
                                 </Table.Tbody>
                             </Table>
                         </ScrollArea>
+                        <Group position="apart" align="center" mt="md">
+                            <Text size="sm" c="dimmed">Showing {paginatedServices.length} of {filteredServices.length} services</Text>
+                            <Pagination total={totalServicePages} page={page} onChange={setPage} color="blue" withEdges />
+                        </Group>
                     </Stack>
                 </Paper>
 

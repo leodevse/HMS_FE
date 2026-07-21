@@ -8,6 +8,7 @@ import {ComingSoonPage} from "../pages/common/ComingSoonPage.jsx";
 import {ReservationDetailPage} from "../pages/receptionist/reservation/ReservationDetailPage.jsx";
 import {CheckoutListPage} from "../pages/receptionist/checkout/CheckoutListPage.jsx";
 import {CheckoutPage} from "../pages/receptionist/checkout/CheckoutPage.jsx";
+import {ProcessPaymentPage} from "../pages/receptionist/checkout/ProcessPaymentPage.jsx";
 
 /** @type {Object.<string, RouteItemType>} */
 const RECEPTIONIST_MAP_ROUTES = {
@@ -66,6 +67,10 @@ const RECEPTIONIST_MAP_ROUTES = {
     CHECK_OUT_ID: {
         path: "/receptionist/reservations/:id/check-out",
         element: <CheckoutPage/>,
+    },
+    PROCESS_PAYMENT_ID: {
+        path: "/receptionist/reservations/:id/process-payment",
+        element: <ProcessPaymentPage/>,
     },
     PAYMENT: {
         path: "/receptionist/payment",
