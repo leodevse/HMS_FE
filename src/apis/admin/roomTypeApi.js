@@ -2,6 +2,19 @@ import axiosInstance from '../axiosConfig';
 
 const API_URL = '/catalog/room-classes';
 
+const normalizeAmenities = (value) => {
+    if (Array.isArray(value)) {
+        return value.map((item) => String(item).trim()).filter(Boolean);
+    }
+    if (typeof value === 'string') {
+        return value
+            .split(',')
+            .map((item) => item.trim())
+            .filter(Boolean);
+    }
+    return [];
+};
+
 function toUiRoomType(item) {
     return {
         id: item.id,
@@ -10,6 +23,7 @@ function toUiRoomType(item) {
         maxOccupancy: Number(item.maxOccupancy || 2),
         extraPersonFee: Number(item.extraPersonFee || 0),
         baseRate: Number(item.basePrice || 0),
+        amenities: normalizeAmenities(item.amenities),
     };
 }
 
@@ -20,6 +34,7 @@ function toApiPayload(data) {
         standardOccupancy: Number(data.standardOccupancy),
         maxOccupancy: Number(data.maxOccupancy),
         extraPersonFee: Number(data.extraPersonFee || 0),
+        amenities: normalizeAmenities(data.amenities),
     };
 }
 

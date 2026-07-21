@@ -60,22 +60,30 @@ export default function ServiceCheckoutPage() {
 
         const fetchProfileAndRooms = async () => {
             try {
-                // 1. Lấy thông tin profile để có được customerId chính xác từ DB
-                const res = await authApi.getMyProfile();
-                const profileData = res.data;
-
-                if (profileData && profileData.id) {
-                    const cId = profileData.id;
-                    setCustomerId(cId);
-
-                    // 2. Lấy danh sách phòng đang sử dụng (IN_HOUSE)
-                    const data = await getActiveAllocations(cId);
-                    const options = data.map(alloc => ({
-                        value: String(alloc.allocationId),
-                        label: `${alloc.roomNumber} - ${alloc.roomClassName}`
-                    }));
-                    setActiveRooms(options);
+                // Prefer JWT/user id from auth context; /auth/me is optional.
+                let cId = customer?.id || customer?.userId || null;
+                try {
+                    const profileData = await authApi.getMyProfile();
+                    if (profileData?.id) {
+                        cId = profileData.id;
+                    }
+                } catch {
+                    // Gateway may not expose /auth/me; local auth user id is enough.
                 }
+
+                if (!cId) {
+                    return;
+                }
+
+                setCustomerId(cId);
+
+                // Rooms from PENDING (already assigned) or IN_HOUSE stays
+                const data = await getActiveAllocations(cId);
+                const options = data.map((alloc) => ({
+                    value: String(alloc.allocationId),
+                    label: `${alloc.roomNumber} - ${alloc.roomClassName} (${alloc.bookingStatus})`,
+                }));
+                setActiveRooms(options);
             } catch (error) {
                 console.error("Error isLoading profile or rooms:", error);
             } finally {
@@ -260,12 +268,12 @@ export default function ServiceCheckoutPage() {
                                 </Alert>
                         ) : activeRooms.length === 0 ? (
                                 <Alert icon={<IconInfoCircle size={16}/>} color="orange" mb="lg">
-                                    You haven't checked in yet or your booking hasn't been confirmed, so you cannot book
-                                    services to your room at this time.
+                                    No rooms found for your bookings. Book a room first (with an assigned room number),
+                                    or ask reception to check you in if your stay is already confirmed.
                                 </Alert>
                         ) : (
                                 <Text c="dimmed" mb="md" size="sm">
-                                    Please allocate the services and quantities to the rooms you are currently using:
+                                    Allocate services to a room from your PENDING or IN_HOUSE bookings:
                                 </Text>
                         )}
 

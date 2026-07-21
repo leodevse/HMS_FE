@@ -1,6 +1,7 @@
 import {useEffect, useState} from 'react';
 import {
     ActionIcon,
+    Badge,
     Button,
     Group,
     Modal,
@@ -9,6 +10,7 @@ import {
     ScrollArea,
     Stack,
     Table,
+    TagsInput,
     Text,
     TextInput,
     Title,
@@ -25,6 +27,7 @@ const emptyRoomType = {
     maxOccupancy: 2,
     baseRate: 90,
     extraPersonFee: 0,
+    amenities: [],
 };
 
 const currencyFormatter = new Intl.NumberFormat('vi-VN', {
@@ -114,6 +117,14 @@ function RoomTypeFormModal({opened, mode, initialValues, onClose, onSubmit}) {
                                 {...form.getInputProps('extraPersonFee')}
                         />
 
+                        <TagsInput
+                                label="Amenities"
+                                placeholder="Type an amenity and press Enter"
+                                description="Examples: Wi-Fi, Air conditioning, Bathtub"
+                                clearable
+                                {...form.getInputProps('amenities')}
+                        />
+
                         <Group justify="flex-end">
                             <Button variant="default" onClick={onClose}>Cancel</Button>
                             <Button type="submit">{mode === 'create' ? 'Create room type' : 'Save changes'}</Button>
@@ -148,6 +159,18 @@ function RoomTypeDetailsModal({opened, roomType, onClose}) {
                         <Text fw={600}>Extra Person Fee</Text>
                         <Text>{formatPrice(roomType.extraPersonFee)}</Text>
                     </Group>
+                    <Stack gap="xs">
+                        <Text fw={600}>Amenities</Text>
+                        <Group gap="xs">
+                            {(roomType.amenities || []).length > 0 ? (
+                                roomType.amenities.map((amenity) => (
+                                    <Badge key={amenity} variant="light">{amenity}</Badge>
+                                ))
+                            ) : (
+                                <Text c="dimmed" size="sm">No amenities</Text>
+                            )}
+                        </Group>
+                    </Stack>
                 </Stack>
             </Modal>
     );
