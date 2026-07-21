@@ -124,8 +124,8 @@ export function LoginForm() {
                     <Stack>
                         <TextInput
                             required
-                            label="Username"
-                            placeholder="Enter your username"
+                            label="Email / Username"
+                            placeholder="your@email.com"
                             autoComplete="username"
                             {...form.getInputProps('username')}
                         />
