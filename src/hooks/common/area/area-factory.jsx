@@ -1,4 +1,4 @@
-import {createContext, useContext, useMemo, useState} from "react";
+import {createContext, useCallback, useContext, useMemo, useState} from "react";
 
 /**
  * @template T
@@ -10,7 +10,10 @@ export const createAreaContext = (initialState) => {
 
     const AreaProvider = ({children}) => {
         const [state, setState] = useState(initialState);
-        const [isLoading, setIsLoading] = useState(false); // Thêm trạng thái isLoading mặc định là false
+        const [isLoading, setIsLoading] = useState(false);
+        const [refetchKey, setRefetchKey] = useState(0);
+
+        const forceRefetchKey = useCallback(() => setRefetchKey((k) => k + 1), []);
 
         /**
          * Hàm cập nhật một phần của state (patching)
@@ -28,22 +31,17 @@ export const createAreaContext = (initialState) => {
             state,
             setState,
             updateState,
-            isLoading,       // Export trạng thái isLoading
-            setIsLoading     // Export hàm điều khiển isLoading
-        }), [state, isLoading]);
+            isLoading,
+            setIsLoading,
+            refetchKey,
+            forceRefetchKey,
+        }), [state, isLoading, refetchKey, forceRefetchKey]);
 
         return <Context.Provider value={value}>{children}</Context.Provider>;
     };
 
     /**
      * Hook để truy cập state, isLoading và các hàm điều khiển
-     * @returns {T & {
-     * state: T,
-     * isLoading: boolean,
-     * setState: React.Dispatch<React.SetStateAction<T>>,
-     * setIsLoading: React.Dispatch<React.SetStateAction<boolean>>,
-     * updateState: (patch: Partial<T> | ((prev: T) => Partial<T>)) => void
-     * }}
      */
     const useArea = () => {
         const context = useContext(Context);

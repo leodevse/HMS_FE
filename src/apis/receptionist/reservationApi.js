@@ -9,11 +9,137 @@ const normalizeReservation = (reservation = {}) => ({
 	numberOfMembers: reservation.numberOfMembers ?? reservation.numberOfRooms ?? 0,
 	checkInDate: attachStandardTime(reservation.checkInDate, 'checkIn'),
 	checkOutDate: attachStandardTime(reservation.checkOutDate, 'checkOut'),
+	identityCard: reservation.identityCard || '',
 });
 
 const toDateOnly = (value) => String(value || '').slice(0, 10);
 
+/**
+ * Transform reservation detail to form data for edit mode
+ * @param {Object} reservation - Full reservation object from getReservationById
+ * @returns {Object} - ReservationRequest format
+ */
+export const transformReservationForEdit = (reservation) => {
+	if (!reservation) return null;
+
+	const customer = reservation.customer || {};
+	const allocations = reservation.allocations || [];
+	const totalMembers = reservation.numberOfMembers || 0;
+
+	// Estimate adults/childs split (default 1 adult if unknown)
+	const adults = totalMembers > 0 ? Math.max(1, Math.min(3, totalMembers)) : 1;
+	const childs = Math.max(0, totalMembers - adults);
+
+	// Transform allocations to roomClassQuantities format
+	const roomClassQuantities = allocations.map((allocation, idx) => ({
+		_key: Date.now() + idx,
+		roomClassId: String(allocation.roomClassId || ''),
+		numberOfPeople: allocation.numberOfPeople || 1,
+		allocationId: allocation.id, // Keep allocation ID for update
+	}));
+
+	return {
+		id: reservation.id,
+		bookingCode: reservation.bookingCode,
+		status: reservation.status,
+		checkInDate: reservation.checkInDate,
+		checkOutDate: reservation.checkOutDate,
+		adults,
+		childs,
+		numberOfMembers: totalMembers,
+		customerRequest: {
+			customerId: customer.id || reservation.customerId,
+			fullName: customer.fullName || '',
+			phoneNumber: customer.phoneNumber || '',
+			email: customer.email || customer.username || '',
+			identityNumber: reservation.identityCard || customer.identityCard || '',
+		},
+		roomClassQuantities,
+		note: reservation.note || '',
+	};
+};
+
+/**
+ * Update reservation (only PENDING status)
+ */
+const updateReservation = async (reservationId, updateData) => {
+	const {data} = await axiosInstance.patch(
+		`/bookings/reservations/${reservationId}/status`,
+		{bookingStatus: 'PENDING'}, // Ensure still PENDING
+	);
+	return data;
+};
+
+/**
+ * Delete old allocation and create new one
+ */
+const updateReservationRooms = async (reservationId, newRoomClassQuantities, dates) => {
+	// Get current allocations
+	const {data: currentAllocations} = await axiosInstance.get('/bookings/reservation-rooms', {
+		params: {reservationId},
+	});
+
+	// Delete all old allocations
+	for (const allocation of (currentAllocations || [])) {
+		await axiosInstance.delete(`/bookings/reservation-rooms/${allocation.id}`);
+	}
+
+	// Create new allocations
+	for (const roomQty of newRoomClassQuantities.filter(r => r.roomClassId)) {
+		// Get available room for this class
+		const {data: available} = await axiosInstance.get('/bookings/availability', {
+			params: {
+				roomClassId: Number(roomQty.roomClassId),
+				checkInDate: toDateOnly(dates.checkInDate),
+				checkOutDate: toDateOnly(dates.checkOutDate),
+			},
+		});
+
+		const rooms = Array.isArray(available) ? available : [];
+		if (rooms.length > 0) {
+			await axiosInstance.post('/bookings/reservation-rooms', {
+				reservationId,
+				roomId: rooms[0].id,
+				checkInDate: toDateOnly(dates.checkInDate),
+				checkOutDate: toDateOnly(dates.checkOutDate),
+				guestCount: Number(roomQty.numberOfPeople),
+			});
+		}
+	}
+};
+
 export const reservationApi = {
+	/**
+	 * Update reservation (only PENDING status)
+	 * @param {number} reservationId
+	 * @param {Object} formData - Form data from MakeReservation
+	 */
+	updateReservation: async (reservationId, formData) => {
+		const totalMembers = (Number(formData.adults) || 0) + (Number(formData.childs) || 0);
+		const selections = (formData.roomClassQuantities || []).filter(r => r.roomClassId);
+
+		if (!selections.length) throw new Error('Please select at least one room class');
+
+		// Update reservation rooms (delete old, create new)
+		await updateReservationRooms(reservationId, selections, {
+			checkInDate: formData.checkInDate,
+			checkOutDate: formData.checkOutDate,
+		});
+
+		// Update identity card separately so the value persisted in MakeReservation is preserved on edit
+		const identityCard = formData.customerRequest?.identityNumber || null;
+		try {
+			await axiosInstance.patch(`/bookings/reservations/${reservationId}/identity-card`, {
+				identityCard,
+			});
+		} catch (err) {
+			// Don't fail the whole edit if identity card update fails (e.g. status no longer PENDING)
+			console.warn('Failed to update identity card on reservation:', err);
+		}
+
+		// Return updated reservation
+		return reservationApi.getReservationById(reservationId);
+	},
 	/**
 	 * Hàm lấy danh sách đặt phòng dựa trên các tham số tìm kiếm
 	 *
@@ -103,7 +229,11 @@ export const reservationApi = {
 		}
 
 		const bookingCode = `RES-${Date.now()}`;
-		const {data: created} = await axiosInstance.post("/bookings/reservations", { bookingCode, customerId });
+		const {data: created} = await axiosInstance.post("/bookings/reservations", {
+			bookingCode,
+			customerId,
+			identityCard: reservationRequest.customerRequest?.identityNumber || null,
+		});
 		const reservationId = created.id ?? created.bookingId;
 		const usedRoomIds = new Set();
 

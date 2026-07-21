@@ -1,4 +1,4 @@
-import {Divider, Stack} from "@mantine/core";
+import {Divider, Group, Stack, Text} from "@mantine/core";
 import {useEffect, useMemo, useState} from "react";
 import {roomClassApi} from "../../../apis/receptionist/roomClassApi.js";
 import {useMakeReservationArea} from "../../../hooks/common/area/make-reservation-area-provider";
@@ -9,62 +9,34 @@ import {SectionCard} from "../../common/SectionCard";
 import {SummaryRow} from "../../common/SummaryRow.jsx";
 import {getStaySurchargeRates} from '../../../utils/hotelStayPolicy';
 
-/**
- * Tính tổng tiền phòng, phụ phí và đặt cọc dựa trên lựa chọn của khách
- *
- * @param {RoomClassQuantityRequest[]} selectedRooms - Danh sách các phòng đã chọn với số lượng khách
- * @param {RoomClassResponse[]} roomClasses - Danh sách hạng phòng có sẵn để lấy giá và sức chứa
- * @param {number} nights - Số đêm lưu trú để tính tổng tiền
- */
-const calculateBookingSummary = (selectedRooms, roomClasses, nights, checkIn, checkOut) => {
-    if ((!selectedRooms || selectedRooms.length === 0 || roomClasses.length === 0 || nights <= 0)) {
-        return {roomCharge: 0, surcharge: 0, total: 0, deposit: 0};
+const calculateRoomBreakdown = (selectedRooms, roomClasses, nights) => {
+    if (!selectedRooms || selectedRooms.length === 0 || !roomClasses || roomClasses.length === 0 || nights <= 0) {
+        return [];
     }
 
-    /**
-     * Tính tiền phòng và phụ phí cho một dòng phòng cụ thể dựa trên loại phòng và số khách
-     *
-     * @param {RoomClassQuantityRequest} selectedRoom - Lựa chọn phòng cụ thể với roomClassId và số khách
-     * @return {Object} - Trả về object chứa roomCharge và surcharge cho dòng phòng đó
-     */
-    const getTotalAmountForRoom = (selectedRoom) => {
-        const roomClass = roomClassService.findRoomClassById(roomClasses, selectedRoom.roomClassId);
-        if (!roomClass) return {roomCharge: 0, surcharge: 0};
-
-        const extraGuests = Math.max(0, (selectedRoom.numberOfPeople || 0) - roomClass.standardCapacity);
-
-        return {
-            roomCharge: roomClass.basePrice * nights,
-            surcharge: extraGuests * roomClass.extraPersonFee * nights,
-        };
-    };
-
-    const {roomCharge, surcharge} = selectedRooms.reduce(
-            (acc, room) => {
-                const {roomCharge, surcharge} = getTotalAmountForRoom(room);
-                acc.roomCharge += roomCharge;
-                acc.surcharge += surcharge;
-                return acc;
-            },
-            {roomCharge: 0, surcharge: 0},
-    );
-
-    const firstNightCharge = selectedRooms.reduce((sum, selectedRoom) => {
-        const roomClass = roomClassService.findRoomClassById(roomClasses, selectedRoom.roomClassId);
-        return sum + (roomClass?.basePrice || 0);
-    }, 0);
-    const rates = getStaySurchargeRates(checkIn, checkOut);
-    const timeSurcharge = firstNightCharge * (rates.earlyCheckIn + rates.lateCheckOut);
-    const total = roomCharge + surcharge + timeSurcharge;
-    const deposit = Math.round(total * 0.2);
-    return {roomCharge, surcharge, timeSurcharge, total, deposit, rates};
+    return selectedRooms
+            .filter((room) => room.roomClassId)
+            .map((room) => {
+                const roomClass = roomClassService.findRoomClassById(roomClasses, room.roomClassId);
+                if (!roomClass) return null;
+                const extraGuests = Math.max(0, (room.numberOfPeople || 0) - roomClass.standardCapacity);
+                const roomCharge = roomClass.basePrice * nights;
+                const surcharge = extraGuests * roomClass.extraPersonFee * nights;
+                return {
+                    roomClassName: roomClass.name,
+                    roomCharge,
+                    surcharge,
+                    extraGuests,
+                    numberOfPeople: room.numberOfPeople || 0,
+                    standardCapacity: roomClass.standardCapacity,
+                    nights,
+                };
+            })
+            .filter(Boolean);
 };
 
 export const BookingSummary = () => {
-    const {state: reservationRequest} = useMakeReservationArea();
-    /**
-     * @type {[RoomClassAvailabilityResponse[], React.Dispatch<React.SetStateAction<RoomClassAvailabilityResponse[]>>]}
-     */
+    const {state: reservationRequest, refetchKey} = useMakeReservationArea();
     const [roomClassAvailabilityResponses, setRoomClassAvailabilityResponses] = useState([]);
 
     const roomClasses = useMemo(
@@ -74,58 +46,99 @@ export const BookingSummary = () => {
 
     useEffect(() => {
         (async () => {
-            // Kiểm tra nếu check-in hoặc check-out chưa có thì không gọi API
             if (!reservationRequest.checkInDate || !reservationRequest.checkOutDate) {
-                setRoomClassAvailabilityResponses([]); // Reset dữ liệu nếu ngày chưa đầy đủ
+                setRoomClassAvailabilityResponses([]);
                 return;
             }
 
             const response = await roomClassApi.getAvailableRooms(
                     reservationRequest.checkInDate,
                     reservationRequest.checkOutDate,
+                    reservationRequest.reservationId || null,
             );
             setRoomClassAvailabilityResponses(response);
         })();
-    }, [reservationRequest, setRoomClassAvailabilityResponses]);
+    }, [reservationRequest.checkInDate, reservationRequest.checkOutDate, reservationRequest.reservationId, refetchKey]);
 
-    /* ── Dữ liệu tính toán (Computed values) ── */
     const stayNights = dateUtils.dateDiff(reservationRequest.checkInDate, reservationRequest.checkOutDate);
-    const bookingSummary = calculateBookingSummary(
-            reservationRequest.roomClassQuantities ?? [],
-            roomClasses,
-            stayNights,
-            reservationRequest.checkInDate,
-            reservationRequest.checkOutDate,
+    const roomBreakdown = useMemo(
+            () => calculateRoomBreakdown(
+                    reservationRequest.roomClassQuantities ?? [],
+                    roomClasses,
+                    stayNights,
+            ),
+            [reservationRequest.roomClassQuantities, roomClasses, stayNights],
     );
 
+    const totalRoomCharge = roomBreakdown.reduce((sum, r) => sum + r.roomCharge, 0);
+    const totalSurcharge = roomBreakdown.reduce((sum, r) => sum + r.surcharge, 0);
+
+    const rates = getStaySurchargeRates(reservationRequest.checkInDate, reservationRequest.checkOutDate);
+    const timeSurcharge = totalRoomCharge * (rates.earlyCheckIn + rates.lateCheckOut);
+    const grandTotal = totalRoomCharge + totalSurcharge + timeSurcharge;
+    const deposit = Math.round(grandTotal * 0.2);
+
     return (
-            <SectionCard title="4. Booking Summary">
+            <SectionCard title="4. Summary">
                 <Stack gap={8}>
-                    <SummaryRow
-                            label={`Room charge (${reservationRequest.roomClassQuantities?.length} room(s) × ${stayNights} night(s))`}
-                            value={formatUtils.formatCurrency(bookingSummary.roomCharge)}
-                    />
-                    {bookingSummary.surcharge > 0 && (
-                            <SummaryRow
-                                    label="Extra guest surcharge"
-                                    value={formatUtils.formatCurrency(bookingSummary.surcharge)}
-                                    color="orange"
-                            />
+                    {roomBreakdown.length > 0 ? (
+                            <>
+                                {roomBreakdown.map((room, idx) => (
+                                        <Group key={idx} justify="space-between" wrap="nowrap">
+                                            <Stack gap={2} style={{flex: 1}}>
+                                                <Text size="sm" fw={500}>
+                                                    {room.roomClassName}
+                                                </Text>
+                                                <Text size="xs" c="dimmed">
+                                                    {room.nights} night(s) × {formatUtils.formatCurrency(room.roomClass?.basePrice ?? 0)}
+                                                    {room.extraGuests > 0 && ` + ${room.extraGuests} extra person(s)`}
+                                                </Text>
+                                            </Stack>
+                                            <Stack gap={2} align="flex-end">
+                                                <Text size="sm" fw={500}>{formatUtils.formatCurrency(room.roomCharge)}</Text>
+                                                {room.surcharge > 0 && (
+                                                        <Text size="xs" c="orange">
+                                                            + {formatUtils.formatCurrency(room.surcharge)}
+                                                        </Text>
+                                                )}
+                                            </Stack>
+                                        </Group>
+                                ))}
+                                <Divider my="xs"/>
+                                <Group justify="space-between">
+                                    <Text size="sm" fw={600}>Room charge</Text>
+                                    <Text size="sm" fw={600}>{formatUtils.formatCurrency(totalRoomCharge)}</Text>
+                                </Group>
+                            </>
+                    ) : (
+                            <Text size="sm" c="dimmed">Select rooms to see pricing</Text>
                     )}
-                    {bookingSummary.timeSurcharge > 0 && (
-                            <SummaryRow
-                                    label={`Early/Late time surcharge (${Math.round((bookingSummary.rates.earlyCheckIn + bookingSummary.rates.lateCheckOut) * 100)}%)`}
-                                    value={formatUtils.formatCurrency(bookingSummary.timeSurcharge)}
-                                    color="orange"
-                            />
+
+                    {totalSurcharge > 0 && (
+                            <Group justify="space-between">
+                                <Text size="sm" c="orange">Extra person surcharge</Text>
+                                <Text size="sm" c="orange">+ {formatUtils.formatCurrency(totalSurcharge)}</Text>
+                            </Group>
                     )}
+
+                    {timeSurcharge > 0 && (
+                            <Group justify="space-between">
+                                <Text size="sm" c="orange">
+                                    Time surcharge ({Math.round((rates.earlyCheckIn + rates.lateCheckOut) * 100)}%)
+                                </Text>
+                                <Text size="sm" c="orange">+ {formatUtils.formatCurrency(timeSurcharge)}</Text>
+                            </Group>
+                    )}
+
                     <Divider my="xs"/>
-                    <SummaryRow label="TOTAL" value={formatUtils.formatCurrency(bookingSummary.total)} bold size="lg"/>
-                    <SummaryRow
-                            label="Deposit required (20%)"
-                            value={formatUtils.formatCurrency(bookingSummary.deposit)}
-                            color="teal"
-                    />
+                    <Group justify="space-between">
+                        <Text size="md" fw={700}>Total</Text>
+                        <Text size="md" fw={700}>{formatUtils.formatCurrency(grandTotal)}</Text>
+                    </Group>
+                    <Group justify="space-between">
+                        <Text size="sm" c="teal" fw={500}>Deposit (20%)</Text>
+                        <Text size="sm" c="teal" fw={500}>{formatUtils.formatCurrency(deposit)}</Text>
+                    </Group>
                 </Stack>
             </SectionCard>
     );

@@ -42,7 +42,7 @@ export const ReservationItem = ({reservation}) => {
 
                 <Table.Td>
                     <Text size="sm">
-                        {reservation.customer.identityCard}
+                        {reservation.identityCard || reservation.customer.identityCard || "—"}
                     </Text>
                 </Table.Td>
 

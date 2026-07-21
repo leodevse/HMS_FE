@@ -5,10 +5,11 @@ import { createDefaultStay } from "../../../utils/hotelStayPolicy";
  * @type {CustomerRequest}
  */
 const customerRequest = {
-    identityCard: "",
+    identityNumber: "",
     fullName: "",
     phoneNumber: "",
     email: "",
+    note: "",
 };
 
 /**
@@ -29,7 +30,8 @@ const defaultStay = createDefaultStay();
 const reservationRequest = {
     checkInDate: defaultStay.checkIn.toISOString(),
     checkOutDate: defaultStay.checkOut.toISOString(),
-    numberOfMembers: 1,
+    adults: 1,
+    childs: 0,
     customerRequest: customerRequest,
     roomClassQuantities: [getDefaultRoomClassQuantity()],
     note: "",

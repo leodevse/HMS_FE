@@ -1,4 +1,4 @@
-import {useEffect, useState} from "react";
+import {useEffect, useMemo, useState} from "react";
 import {useNavigate, useParams} from "react-router-dom";
 import {
     Badge,
@@ -6,23 +6,30 @@ import {
     Button,
     Card,
     Container,
-    Divider,
     Grid,
     Group,
     Loader,
     Paper,
     Select,
     Stack,
+    Table,
     Text,
     TextInput,
     Title
 } from "@mantine/core";
-import {IconArrowLeft, IconBuildingStore, IconCalendar, IconCheck, IconExternalLink, IconUser} from "@tabler/icons-react";
+import {IconArrowLeft, IconCheck, IconId, IconTrash} from "@tabler/icons-react";
 import {reservationApi} from "../../../apis/receptionist/reservationApi";
 import {roomApi} from "../../../apis/receptionist/roomApi";
 import {roomClassApi} from "../../../apis/receptionist/roomClassApi";
 import {formatUtils} from "../../../utils/formatUtils";
 import {notifications} from "@mantine/notifications";
+
+const ROLE_OPTIONS = [
+    {value: "OWNER", label: "Owner"},
+    {value: "MEMBER", label: "Member"},
+];
+
+const STANDARD_CHECKIN_HOUR = 14;
 
 export const CheckInPage = () => {
     const {id} = useParams();
@@ -38,9 +45,7 @@ export const CheckInPage = () => {
     const [occupants, setOccupants] = useState({});
 
     useEffect(() => {
-        if (id) {
-            fetchInitialData();
-        }
+        if (id) fetchInitialData();
     }, [id]);
 
     useEffect(() => {
@@ -67,16 +72,18 @@ export const CheckInPage = () => {
                     String(resDetail.checkOutDate).slice(0, 10)
                 );
 
-                const roomOptions = (rooms || []).map(r => ({
-                    value: r.id.toString(),
-                    label: r.roomNumber
-                }));
+                // Rule: Only show Clean (VC) status rooms
+                const roomOptions = (rooms || [])
+                    .filter(r => !r.status || r.status === 'CLEAN' || r.status === 'VC' || r.status === 'AVAILABLE')
+                    .map(r => ({
+                        value: r.id.toString(),
+                        label: r.roomNumber
+                    }));
 
-                // Nếu đã được gán phòng từ trước, đảm bảo phòng đó có trong danh sách lựa chọn
                 if (allocation.roomId && !roomOptions.find(opt => opt.value === allocation.roomId.toString())) {
                     roomOptions.push({
                         value: allocation.roomId.toString(),
-                        label: allocation.roomNumber || `Phòng ${allocation.roomId}` // Fallback nếu thiếu roomNumber
+                        label: allocation.roomNumber || `Room ${allocation.roomId}`
                     });
                 }
 
@@ -87,20 +94,24 @@ export const CheckInPage = () => {
             await Promise.all(fetchPromises);
             setAvailableRoomsByAllocation(availableRoomsMap);
             setAssignments(initialAssignments);
-            setOccupants(Object.fromEntries((resDetail.allocations || []).map((allocation) => [
-                allocation.id,
-                Array.from({length: Math.max(Number(allocation.numberOfPeople) || 1, 1)}, () => ({
-                    guestName: "",
-                    phoneNumber: "",
-                    identityDocument: "",
-                    residence: "",
-                })),
-            ])));
+
+            // Initialize occupants: first is Owner, rest are Members
+            setOccupants(Object.fromEntries((resDetail.allocations || []).map((allocation) => {
+                const count = Math.max(Number(allocation.numberOfPeople) || 1, 1);
+                return [
+                    allocation.id,
+                    Array.from({length: count}, (_, idx) => ({
+                        role: idx === 0 ? "OWNER" : "MEMBER",
+                        guestName: "",
+                        identityDocument: "",
+                    }))
+                ];
+            })));
         } catch (error) {
             console.error("Failed to load check-in data", error);
             notifications.show({
-                title: "Lỗi",
-                message: "Không thể tải thông tin đặt phòng hoặc danh sách phòng trống",
+                title: "Error",
+                message: "Failed to load reservation or available rooms",
                 color: "red"
             });
         } finally {
@@ -108,78 +119,23 @@ export const CheckInPage = () => {
         }
     };
 
-    const handleCheckIn = async () => {
+    // Check time logic: Early arrival if before 14:00 of check-in day
+    const timeStatus = useMemo(() => {
         const scheduledCheckIn = reservation?.checkInDate ? new Date(reservation.checkInDate) : null;
-        if (scheduledCheckIn && currentTime < scheduledCheckIn) {
-            notifications.show({
-                title: "Chưa đến giờ nhận phòng",
-                message: `Booking này chỉ được check-in từ ${formatUtils.formatDate(scheduledCheckIn, true)}.`,
-                color: "orange"
-            });
-            return;
-        }
-        const missingAssignments = (reservation.allocations || []).some(a => !assignments[a.id]);
-        if (missingAssignments) {
-            notifications.show({
-                title: "Lỗi",
-                message: "Vui lòng chọn phòng cụ thể cho tất cả các phân bổ",
-                color: "red"
-            });
-            return;
-        }
+        if (!scheduledCheckIn) return {isValid: true, label: "(Valid)", color: "green", isTooEarly: false};
 
-        const invalidOccupants = (reservation.allocations || []).some((allocation) =>
-            (occupants[allocation.id] || []).length !== Math.max(Number(allocation.numberOfPeople) || 1, 1)
-            || (occupants[allocation.id] || []).some((guest) =>
-                !guest.guestName.trim() || !guest.phoneNumber.trim()
-                || !guest.identityDocument.trim() || !guest.residence.trim()
-            )
-        );
-        if (invalidOccupants) {
-            notifications.show({
-                title: "Thiếu thông tin khách lưu trú",
-                message: "Vui lòng nhập đầy đủ họ tên, số điện thoại, CCCD/hộ chiếu và nơi cư trú của tất cả khách.",
-                color: "red"
-            });
-            return;
-        }
+        const scheduledHour = scheduledCheckIn.getHours();
+        const currentHour = currentTime.getHours();
+        const isEarly = currentHour < STANDARD_CHECKIN_HOUR && scheduledHour <= STANDARD_CHECKIN_HOUR;
 
-        setSubmitting(true);
-        try {
-            const checkInRequest = {
-                roomAssignments: (reservation.allocations || []).map((allocation) => ({
-                    reservationRoomId: Number(allocation.id),
-                    roomId: Number(assignments[allocation.id]),
-                    occupants: (occupants[allocation.id] || []).map((guest) => ({
-                        guestName: guest.guestName.trim(),
-                        phoneNumber: guest.phoneNumber.trim(),
-                        identityDocument: guest.identityDocument.trim(),
-                        residence: guest.residence.trim(),
-                    })),
-                })),
-            };
-            await reservationApi.checkInReservation(id, checkInRequest);
-            notifications.show({
-                message: "Check-in thành công!",
-                color: "green",
-                icon: <IconCheck size={16} />
-            });
-            navigate("/receptionist/reservations");
-        } catch (error) {
-            console.error("Check-in failed", error);
-            notifications.show({
-                title: "Lỗi Check-in",
-                message: error.response?.data?.message || "Hệ thống gặp lỗi khi thực hiện check-in",
-                color: "red"
-            });
-        } finally {
-            setSubmitting(false);
-        }
-    };
-
-    const getRoomClassName = (classId) => {
-        return roomClasses.find(rc => rc.id === classId)?.name || `Hạng phòng ${classId}`;
-    };
+        return {
+            isValid: !isEarly,
+            label: isEarly ? "Early Arrival" : "(Valid)",
+            color: isEarly ? "red" : "green",
+            isTooEarly: isEarly,
+            surcharge: isEarly ? "Early check-in surcharge may apply" : null,
+        };
+    }, [reservation, currentTime]);
 
     const updateOccupant = (allocationId, guestIndex, field, value) => {
         setOccupants((current) => ({
@@ -190,246 +146,363 @@ export const CheckInPage = () => {
         }));
     };
 
+    const addOccupant = (allocationId) => {
+        setOccupants((current) => ({
+            ...current,
+            [allocationId]: [...(current[allocationId] || []), {role: "MEMBER", guestName: "", identityDocument: ""}],
+        }));
+    };
+
+    const removeOccupant = (allocationId, guestIndex) => {
+        const list = occupants[allocationId] || [];
+        // Cannot delete if it's the only Owner
+        const guest = list[guestIndex];
+        if (guest?.role === "OWNER") {
+            const ownerCount = list.filter(g => g.role === "OWNER").length;
+            if (ownerCount <= 1) {
+                notifications.show({
+                    title: "Cannot delete",
+                    message: "Each room must have at least one Owner.",
+                    color: "orange",
+                });
+                return;
+            }
+        }
+        setOccupants((current) => ({
+            ...current,
+            [allocationId]: list.filter((_, i) => i !== guestIndex),
+        }));
+    };
+
+    const handleScanIdentityCard = (allocationId, guestIndex) => {
+        // Placeholder for actual scanner integration
+        notifications.show({
+            title: "Scanner",
+            message: "Card scanner not connected. Please enter information manually.",
+            color: "blue",
+        });
+    };
+
+    // Validation: each room must have at least one Owner with Identity ID
+    const isFormValid = useMemo(() => {
+        if (!reservation?.allocations) return false;
+
+        // All rooms assigned
+        const allAssigned = reservation.allocations.every(a => assignments[a.id]);
+        if (!allAssigned) return false;
+
+        // Each room has at least one Owner with Identity ID
+        const allOwnersValid = reservation.allocations.every((allocation) => {
+            const roomOccupants = occupants[allocation.id] || [];
+            const owners = roomOccupants.filter(g => g.role === "OWNER");
+            return owners.length > 0 && owners.every(o => o.guestName.trim() && o.identityDocument.trim());
+        });
+
+        // All owners have Name
+        const allNamesValid = reservation.allocations.every((allocation) => {
+            const roomOccupants = occupants[allocation.id] || [];
+            return roomOccupants.every(g => g.guestName.trim());
+        });
+
+        return allOwnersValid && allNamesValid;
+    }, [reservation, assignments, occupants]);
+
+    const handleCheckIn = async () => {
+        if (!isFormValid) return;
+
+        setSubmitting(true);
+        try {
+            const checkInRequest = {
+                roomAssignments: (reservation.allocations || []).map((allocation) => ({
+                    reservationRoomId: Number(allocation.id),
+                    roomId: Number(assignments[allocation.id]),
+                    occupants: (occupants[allocation.id] || []).map((guest) => ({
+                        guestName: guest.guestName.trim(),
+                        role: guest.role,
+                        identityDocument: guest.identityDocument.trim() || null,
+                    })),
+                })),
+            };
+            await reservationApi.checkInReservation(id, checkInRequest);
+            notifications.show({
+                title: "Success",
+                message: "Check-in successful!",
+                color: "green",
+                icon: <IconCheck size={16}/>
+            });
+            navigate("/receptionist/reservations");
+        } catch (error) {
+            console.error("Check-in failed", error);
+            notifications.show({
+                title: "Check-in failed",
+                message: error.response?.data?.message || "System error occurred",
+                color: "red"
+            });
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    const getRoomClassName = (classId) => {
+        return roomClasses.find(rc => rc.id === classId)?.name || `Room Class ${classId}`;
+    };
+
     if (loading) {
         return (
-            <Container py="xl" ta="center">
-                <Loader size="lg" variant="dots" />
-                <Text mt="md" c="dimmed">Đang tải thông tin check-in...</Text>
-            </Container>
+                <Container py="xl" ta="center">
+                    <Loader size="lg" variant="dots"/>
+                    <Text mt="md" c="dimmed">Loading check-in information...</Text>
+                </Container>
         );
     }
 
     if (!reservation) {
         return (
-            <Container py={80} ta="center">
-                <Paper p="xl" withBorder shadow="sm" radius="md">
-                    <Text fw={600} size="xl" color="red">Không tìm thấy thông tin đơn đặt phòng</Text>
-                    <Button variant="light" mt="xl" size="lg" onClick={() => navigate(-1)}>
-                        Quay lại danh sách
-                    </Button>
-                </Paper>
-            </Container>
+                <Container py={80} ta="center">
+                    <Paper p="xl" withBorder shadow="sm" radius="md">
+                        <Text fw={600} size="xl" color="red">Reservation not found</Text>
+                        <Button variant="light" mt="xl" size="lg" onClick={() => navigate(-1)}>
+                            Back to list
+                        </Button>
+                    </Paper>
+                </Container>
         );
     }
 
-    const scheduledCheckIn = reservation.checkInDate ? new Date(reservation.checkInDate) : null;
-    const isTooEarly = scheduledCheckIn && currentTime < scheduledCheckIn;
-
-    const SectionTitle = ({children}) => (
-        <Group gap="xs" mb="md" mt={20}>
-            <Box style={{width: 4, height: 24, backgroundColor: '#f26522', borderRadius: 4}} />
-            <Text fw={700} size="md" tt="uppercase" c="#004a8b">
-                {children}
-            </Text>
-        </Group>
-    );
-
     return (
-        <Container size="md" py="xl">
-            {/* Header */}
-            <Group justify="space-between" mb="xl">
-                <Stack gap={0}>
-                    <Title order={1} fw={800} c="blue.9" style={{fontSize: 28}}>Check-in</Title>
-                    <Text size="sm" c="dimmed">Nhận phòng khách hàng</Text>
-                </Stack>
-                <Badge size="xl" variant="dot" color="blue" py="md">
-                    {reservation.bookingCode}
-                </Badge>
-            </Group>
-
-            <Stack gap="xl">
-                {/* Information Card */}
-                <Card shadow="sm" radius="lg" p="xl" withBorder style={{borderTop: '4px solid #f26522'}}>
-                    <SectionTitle>Thông tin đặt phòng</SectionTitle>
-                    
-                    <Grid gutter="xl">
-                        {/* Row 1 */}
-                        <Grid.Col span={{base: 12, sm: 4}}>
-                            <Text size="xs" c="dimmed" tt="uppercase" fw={700}>Mã đặt phòng</Text>
-                            <Text fw={800} size="lg" c="blue.9">{reservation.bookingCode}</Text>
-                        </Grid.Col>
-                        
-                        <Grid.Col span={{base: 12, sm: 4}}>
-                            <Text size="xs" c="dimmed" tt="uppercase" fw={700}>Khách hàng</Text>
-                            <Text fw={700} size="lg">{reservation.customer.fullName}</Text>
-                        </Grid.Col>
-
-                        {/* <Grid.Col span={{base: 12, sm: 4}}>
-                            <Text size="xs" c="dimmed" tt="uppercase" fw={700}>CCCD / Hộ chiếu</Text>
-                            <Text fw={700} size="lg">{reservation.customer.identityCard || "—"}</Text>
-                        </Grid.Col> */}
-                        
-                        <Grid.Col span={{base: 12, sm: 4}}>
-                            <Text size="xs" c="dimmed" tt="uppercase" fw={700}>Thời gian hiện tại</Text>
-                            <Group gap={5}>
-                                <Text fw={700} c="green.7">
-                                    {formatUtils.formatDate(currentTime, true)}
-                                </Text>
-                                <Badge color={isTooEarly ? "orange" : "green"} size="xs" variant="light">
-                                    {isTooEarly ? "CHƯA ĐẾN GIỜ" : "✓ CÓ THỂ CHECK-IN"}
-                                </Badge>
-                            </Group>
-                        </Grid.Col>
-
-                        {/* Row 2 */}
-                        <Grid.Col span={{base: 12, sm: 4}}>
-                            <Text size="xs" c="dimmed" tt="uppercase" fw={700}>Ngày nhận phòng</Text>
-                            <Text fw={600}>{formatUtils.formatDate(reservation.checkInDate, true)}</Text>
-                        </Grid.Col>
-
-                        
-
-                        <Grid.Col span={{base: 12, sm: 4}}>
-                            <Text size="xs" c="dimmed" tt="uppercase" fw={700}>Ngày trả phòng</Text>
-                            <Text fw={600}>{formatUtils.formatDate(reservation.checkOutDate, true)}</Text>
-                        </Grid.Col>
-                    </Grid>
-                </Card>
-
-                {/* Allocation Card */}
-                <Card shadow="sm" radius="lg" p="xl" withBorder style={{borderTop: '4px solid #f26522'}}>
-                    <SectionTitle>Phân bổ phòng</SectionTitle>
-                    
-                    <Stack gap={25}>
-                        {(reservation.allocations || []).map((allocation, index) => (
-                            <Box key={allocation.id}>
-                                <Stack gap="xs">
-                                    <Group justify="space-between" align="flex-end">
-                                        <Text fw={700} c="blue.9" size="sm">
-                                            PHÒNG {index + 1} — {getRoomClassName(allocation.roomClassId).toUpperCase()}
-                                        </Text>
-                                        
-                                        <Group gap="xs" align="center">
-                                            <Text size="sm" fw={500} c="dimmed">Số phòng:</Text>
-                                            <Select
-                                                placeholder="Chọn số phòng"
-                                                data={availableRoomsByAllocation[allocation.id] || []}
-                                                value={assignments[allocation.id]}
-                                                onChange={(val) => setAssignments(prev => ({...prev, [allocation.id]: val}))}
-                                                style={{width: 140}}
-                                                size="sm"
-                                                radius="md"
-                                                searchable
-                                                clearable
-                                            />
-                                        </Group>
-                                    </Group>
-                                    
-                                    <Paper p="sm" bg="gray.0" radius="md" withBorder style={{borderStyle: 'dashed'}}>
-                                        <Group justify="space-between">
-                                            <Group gap="xs">
-                                                <IconUser size={16} color="#004a8b" />
-                                                <Text size="sm" fw={600} c="blue.8">Phân bổ số lượng:</Text>
-                                            </Group>
-                                            <Badge variant="filled" size="lg" radius="xs" px="lg" color="blue">
-                                                {allocation.numberOfPeople} KHÁCH
-                                            </Badge>
-                                        </Group>
-                                    </Paper>
-                                </Stack>
-                            </Box>
-                        ))}
-                    </Stack>
-                </Card>
-
-                {/* Actual occupants are registered at check-in, not at reservation time. */}
-                <Card shadow="sm" radius="lg" p="xl" withBorder style={{borderTop: '4px solid #f26522'}}>
-                    <SectionTitle>Thông tin khách lưu trú</SectionTitle>
-                    <Text size="sm" c="dimmed" mb="lg">
-                        Nhập đầy đủ thông tin của từng người thực tế sử dụng phòng để lập danh sách lưu trú.
-                    </Text>
-                    <Stack gap="xl">
-                        {(reservation.allocations || []).map((allocation, allocationIndex) => (
-                            <Box key={allocation.id}>
-                                <Group justify="space-between" mb="sm">
-                                    <Text fw={700} c="blue.9">
-                                        Phòng {assignments[allocation.id]
-                                            ? (availableRoomsByAllocation[allocation.id] || []).find((room) => room.value === assignments[allocation.id])?.label
-                                            : allocationIndex + 1}
-                                        {' — '}{getRoomClassName(allocation.roomClassId)}
-                                    </Text>
-                                    <Badge color="blue" variant="light">
-                                        {(occupants[allocation.id] || []).length} khách
-                                    </Badge>
-                                </Group>
-                                <Stack gap="md">
-                                    {(occupants[allocation.id] || []).map((guest, guestIndex) => (
-                                        <Paper key={guestIndex} p="md" radius="md" withBorder bg="gray.0">
-                                            <Text fw={700} size="sm" mb="sm">Khách {guestIndex + 1}</Text>
-                                            <Grid gutter="sm">
-                                                <Grid.Col span={{base: 12, sm: 6}}>
-                                                    <TextInput
-                                                        label="Họ và tên"
-                                                        placeholder="Nguyễn Văn A"
-                                                        required
-                                                        value={guest.guestName}
-                                                        onChange={(event) => updateOccupant(allocation.id, guestIndex, 'guestName', event.currentTarget.value)}
-                                                    />
-                                                </Grid.Col>
-                                                <Grid.Col span={{base: 12, sm: 6}}>
-                                                    <TextInput
-                                                        label="Số điện thoại"
-                                                        placeholder="09xxxxxxxx"
-                                                        required
-                                                        value={guest.phoneNumber}
-                                                        onChange={(event) => updateOccupant(allocation.id, guestIndex, 'phoneNumber', event.currentTarget.value)}
-                                                    />
-                                                </Grid.Col>
-                                                <Grid.Col span={{base: 12, sm: 6}}>
-                                                    <TextInput
-                                                        label="CCCD / Hộ chiếu"
-                                                        placeholder="Số giấy tờ tùy thân"
-                                                        required
-                                                        value={guest.identityDocument}
-                                                        onChange={(event) => updateOccupant(allocation.id, guestIndex, 'identityDocument', event.currentTarget.value)}
-                                                    />
-                                                </Grid.Col>
-                                                <Grid.Col span={{base: 12, sm: 6}}>
-                                                    <TextInput
-                                                        label="Nơi cư trú"
-                                                        placeholder="Địa chỉ cư trú"
-                                                        required
-                                                        value={guest.residence}
-                                                        onChange={(event) => updateOccupant(allocation.id, guestIndex, 'residence', event.currentTarget.value)}
-                                                    />
-                                                </Grid.Col>
-                                            </Grid>
-                                        </Paper>
-                                    ))}
-                                </Stack>
-                            </Box>
-                        ))}
-                    </Stack>
-                </Card>
-
-                {/* Footer Actions */}
-                <Paper p="lg" radius="xl" bg="gray.1" shadow="xs" mt="md" withBorder>
-                    <Group justify="space-between">
-                        <Button 
-                            variant="white" 
-                            color="gray" 
-                            size="lg" 
-                            px={40} 
-                            radius="md"
-                            onClick={() => navigate(-1)}
-                        >
-                            Hủy
+            <Container size="lg" py="xl">
+                {/* Header */}
+                <Group justify="space-between" mb="xl">
+                    <Group>
+                        <Button variant="subtle" leftSection={<IconArrowLeft size={16}/>} onClick={() => navigate(-1)}>
+                            Back
                         </Button>
-                        <Button 
-                            color="blue.8" 
-                            size="lg" 
-                            px={40} 
-                            radius="md"
-                            loading={submitting}
-                            disabled={Boolean(isTooEarly)}
-                            onClick={handleCheckIn}
-                            rightSection={<IconExternalLink size={18} />}
-                        >
-                            Xác nhận Check-in
-                        </Button>
+                        <Title order={2} fw={800}>Check-in</Title>
                     </Group>
-                </Paper>
-            </Stack>
-        </Container>
+                    <Badge size="xl" color="blue" variant="filled">
+                        {reservation.bookingCode}
+                    </Badge>
+                </Group>
+
+                <Stack gap="lg">
+                    {/* 1. Reservation Information */}
+                    <Card shadow="sm" radius="md" p="lg" withBorder>
+                        <Text fw={700} size="md" mb="md" c="dark">Reservation Information</Text>
+                        <Grid gutter="md">
+                            <Grid.Col span={{base: 12, sm: 4}}>
+                                <Group gap="xs" wrap="nowrap">
+                                    <Text size="sm" fw={500} c="dark">Reservation Code:</Text>
+                                    <Text size="sm" fw={700} c="dark">{reservation.bookingCode}</Text>
+                                </Group>
+                            </Grid.Col>
+                            <Grid.Col span={{base: 12, sm: 4}}>
+                                <Group gap="xs" wrap="nowrap">
+                                    <Text size="sm" fw={500} c="dark">Reservation Holder:</Text>
+                                    <Text size="sm" fw={700} c="dark">{reservation.customer?.fullName || "—"}</Text>
+                                </Group>
+                            </Grid.Col>
+                            <Grid.Col span={{base: 12, sm: 4}}>
+                                <Group gap="xs" wrap="nowrap">
+                                    <Text size="sm" fw={500} c="dark">Identity ID:</Text>
+                                    <Text size="sm" fw={700} c="dark">{reservation.identityCard || reservation.customer?.identityCard || "—"}</Text>
+                                </Group>
+                            </Grid.Col>
+                            <Grid.Col span={{base: 12, sm: 4}}>
+                                <Group gap="xs" wrap="nowrap">
+                                    <Text size="sm" fw={500} c="dark">Check-in:</Text>
+                                    <Text size="sm" fw={600} c="dark">{formatUtils.formatDate(reservation.checkInDate, true)}</Text>
+                                </Group>
+                            </Grid.Col>
+                            <Grid.Col span={{base: 12, sm: 4}}>
+                                <Group gap="xs" wrap="nowrap">
+                                    <Text size="sm" fw={500} c="dark">Check-out:</Text>
+                                    <Text size="sm" fw={600} c="dark">{formatUtils.formatDate(reservation.checkOutDate, true)}</Text>
+                                </Group>
+                            </Grid.Col>
+                            <Grid.Col span={{base: 12, sm: 4}}>
+                                <Group gap="xs" wrap="nowrap">
+                                    <Text size="sm" fw={500} c="dark">Current Time:</Text>
+                                    <Text size="sm" fw={700} c="dark">
+                                        {formatUtils.formatDate(currentTime, true)}
+                                    </Text>
+                                    <Text size="sm" c={timeStatus.color} fw={500}>
+                                        {timeStatus.label}
+                                    </Text>
+                                </Group>
+                                {timeStatus.surcharge && (
+                                        <Text size="xs" c="red" mt={2}>{timeStatus.surcharge}</Text>
+                                )}
+                            </Grid.Col>
+                        </Grid>
+                        <Group justify="flex-end" mt="md">
+                            <Button
+                                    variant="outline"
+                                    leftSection={<IconId size={16}/>}
+                                    onClick={() => {
+                                        notifications.show({
+                                            title: "Scanner",
+                                            message: "Card scanner not connected. Please enter information manually.",
+                                            color: "blue",
+                                        });
+                                    }}
+                                    size="sm"
+                                    radius="md"
+                            >
+                                Scan Identity Card
+                            </Button>
+                        </Group>
+                    </Card>
+
+                    {/* 2. Room Allocation & Guests */}
+                    <Card shadow="sm" radius="md" p="lg" withBorder>
+                        <Text fw={700} size="md" mb="md" c="blue.9">Room Allocation</Text>
+
+                        <Stack gap="xl">
+                            {(reservation.allocations || []).map((allocation, index) => {
+                                const cleanRooms = availableRoomsByAllocation[allocation.id] || [];
+                                const noCleanRoom = cleanRooms.length === 0;
+
+                                return (
+                                        <Box key={allocation.id}>
+                                            <Group justify="space-between" mb="sm" align="flex-end">
+                                                <Stack gap={2}>
+                                                    <Text fw={700} c="blue.9" size="sm">
+                                                        Selected Room {index + 1}: {getRoomClassName(allocation.roomClassId)}
+                                                    </Text>
+                                                    <Group gap="xs" align="center">
+                                                        <Text size="sm" fw={500} c="dimmed">Assign Room:</Text>
+                                                        <Select
+                                                                placeholder="Select physical room"
+                                                                data={cleanRooms}
+                                                                value={assignments[allocation.id]}
+                                                                onChange={(val) => setAssignments(prev => ({...prev, [allocation.id]: val}))}
+                                                                style={{width: 200}}
+                                                                size="sm"
+                                                                radius="md"
+                                                                searchable
+                                                                clearable
+                                                        />
+                                                        {noCleanRoom && (
+                                                                <Text size="xs" c="red" fw={500}>No clean room available</Text>
+                                                        )}
+                                                    </Group>
+                                                </Stack>
+                                                <Badge color="blue" variant="light" size="lg">
+                                                    {(occupants[allocation.id] || []).length} guests
+                                                </Badge>
+                                            </Group>
+
+                                            {/* Guest Table */}
+                                            <Table withColumnBorders withTableBorder mt="sm" layout="fixed">
+                                                <Table.Thead bg="blue.0">
+                                                    <Table.Tr>
+                                                        <Table.Th w={140}>Role</Table.Th>
+                                                        <Table.Th>Name</Table.Th>
+                                                        <Table.Th w={200}>Identity ID</Table.Th>
+                                                        <Table.Th w={260}>Actions</Table.Th>
+                                                    </Table.Tr>
+                                                </Table.Thead>
+                                                <Table.Tbody>
+                                                    {(occupants[allocation.id] || []).map((guest, guestIndex) => (
+                                                            <Table.Tr key={guestIndex}>
+                                                                <Table.Td>
+                                                                    <Select
+                                                                            data={ROLE_OPTIONS}
+                                                                            value={guest.role}
+                                                                            onChange={(val) => updateOccupant(allocation.id, guestIndex, 'role', val)}
+                                                                            size="xs"
+                                                                            radius="md"
+                                                                            allowDeselect={false}
+                                                                    />
+                                                                </Table.Td>
+                                                                <Table.Td>
+                                                                    <TextInput
+                                                                            placeholder="Full name (max 100 chars)"
+                                                                            value={guest.guestName}
+                                                                            onChange={(e) => updateOccupant(allocation.id, guestIndex, 'guestName', e.currentTarget.value)}
+                                                                            maxLength={100}
+                                                                            size="xs"
+                                                                            radius="md"
+                                                                    />
+                                                                </Table.Td>
+                                                                <Table.Td>
+                                                                    <TextInput
+                                                                            placeholder={guest.role === "OWNER" ? "Required (max 20)" : "Optional (max 20)"}
+                                                                            value={guest.identityDocument}
+                                                                            onChange={(e) => updateOccupant(allocation.id, guestIndex, 'identityDocument', e.currentTarget.value)}
+                                                                            maxLength={20}
+                                                                            size="xs"
+                                                                            radius="md"
+                                                                            required={guest.role === "OWNER"}
+                                                                    />
+                                                                </Table.Td>
+                                                                <Table.Td>
+                                                                    <Group gap={4}>
+                                                                        <Button
+                                                                                size="xs"
+                                                                                variant="outline"
+                                                                                leftSection={<IconId size={12}/>}
+                                                                                onClick={() => handleScanIdentityCard(allocation.id, guestIndex)}
+                                                                        >
+                                                                            Scan
+                                                                        </Button>
+                                                                        <Button
+                                                                                size="xs"
+                                                                                variant="outline"
+                                                                                color="red"
+                                                                                leftSection={<IconTrash size={12}/>}
+                                                                                onClick={() => removeOccupant(allocation.id, guestIndex)}
+                                                                        >
+                                                                            Delete
+                                                                        </Button>
+                                                                    </Group>
+                                                                </Table.Td>
+                                                            </Table.Tr>
+                                                    ))}
+                                                </Table.Tbody>
+                                            </Table>
+
+                                            <Group justify="flex-start" mt="sm">
+                                                <Button
+                                                        size="xs"
+                                                        variant="outline"
+                                                        onClick={() => addOccupant(allocation.id)}
+                                                >
+                                                    + Add guest
+                                                </Button>
+                                            </Group>
+                                        </Box>
+                                );
+                            })}
+                        </Stack>
+                    </Card>
+
+                    {/* 3. Footer Actions */}
+                    <Paper p="lg" radius="md" bg="gray.1" withBorder>
+                        <Group justify="space-between">
+                            <Button
+                                    variant="outline"
+                                    color="gray"
+                                    size="md"
+                                    radius="md"
+                                    onClick={() => navigate("/receptionist/reservations")}
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                    color="blue"
+                                    size="md"
+                                    radius="md"
+                                    leftSection={<IconCheck size={16}/>}
+                                    loading={submitting}
+                                    disabled={!isFormValid}
+                                    onClick={handleCheckIn}
+                            >
+                                Confirm Check-in
+                            </Button>
+                        </Group>
+                    </Paper>
+                </Stack>
+            </Container>
     );
 };

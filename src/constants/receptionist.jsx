@@ -22,6 +22,11 @@ const RECEPTIONIST_MAP_ROUTES = {
         path: "/receptionist/reservations/:id",
         element: <ReservationDetailPage/>
     },
+    RESERVATION_EDIT: {
+        path: "/receptionist/reservations/:id/edit",
+        label: "Edit Reservation",
+        element: <MakeReservationPage isEditMode={true} reservationIdFromRoute={true} />,
+    },
     CHECK_IN_ID: {
         path: "/receptionist/reservations/:id/check-in",
         element: <CheckInPage/>

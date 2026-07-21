@@ -28,6 +28,7 @@ import ScheduleManagementPage from "../pages/admin/ScheduleManagementPage.jsx";
 import TaskManagementPage from "../pages/admin/TaskManagementPage.jsx";
 import BookingDetailPage from "../pages/customer/BookingDetailPage.jsx";
 import MyReviewsPage from "../pages/customer/MyReviewsPage.jsx";
+import ProfilePage from "../pages/customer/ProfilePage.jsx";
 import PaymentManagementPage from "../pages/admin/PaymentManagementPage.jsx";
 import ReservationManagementPage from "../pages/admin/ReservationManagementPage.jsx";
 import UnauthorizedPage from "../pages/error/UnauthorizedPage.jsx";
@@ -125,6 +126,7 @@ export const router = createBrowserRouter([
             {path: 'history', element: <ProtectedRoute><BookingHistoryPage/></ProtectedRoute>},
             {path: 'bookings/:bookingId', element: <ProtectedRoute><BookingDetailPage/></ProtectedRoute>},
             {path: 'reviews', element: <ProtectedRoute><MyReviewsPage/></ProtectedRoute>},
+            {path: 'profile', element: <ProtectedRoute><ProfilePage/></ProtectedRoute>},
             {path: 'payment/vnpay-callback', element: <PaymentCallbackPage/>},
         ],
     },

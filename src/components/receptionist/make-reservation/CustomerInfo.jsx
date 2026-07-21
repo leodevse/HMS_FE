@@ -1,70 +1,77 @@
-import {Button, Grid, Group, Stack, Textarea, TextInput} from "@mantine/core";
+import {Button, Grid, Group, Stack, Textarea, Text, TextInput} from "@mantine/core";
 import {customerApi} from "../../../apis/receptionist/customerApi";
 import {useMakeReservationArea} from "../../../hooks/common/area/make-reservation-area-provider";
-import {useObjectState} from "../../../hooks/common/use-object-state";
 import {SectionCard} from "../../common/SectionCard";
 import {IconSearch} from "@tabler/icons-react";
-import {useState} from "react"; // Thêm useState
+import {useState} from "react";
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PHONE_REGEX = /^[0-9]*$/;
 
 export const CustomerInfo = () => {
-    // loading này dùng để đồng bộ với trạng thái chung của cả Area
     const {
         state: reservationRequest,
         setState: setReservationRequest,
-        loading: isAreaLoading
+        loading: isAreaLoading,
     } = useMakeReservationArea();
 
-    // State loading nội bộ cho riêng việc search khách hàng
     const [isSearching, setIsSearching] = useState(false);
 
-    const {
-        data: customerRequest,
-        updateField,
-    } = useObjectState(reservationRequest.customerRequest);
-
-    const {updateField: updateReservationRequest} = useObjectState(reservationRequest);
+    const customerRequest = reservationRequest.customerRequest || {};
 
     const updateCustomerRequest = (field, value) => {
-        updateField(field, value);
         setReservationRequest((prev) => ({
             ...prev,
             customerRequest: {
                 ...prev.customerRequest,
-                [field]: value
+                [field]: value,
             },
         }));
     };
 
     const searchCustomerHandler = async () => {
-        if (!customerRequest.identityCard) {
-            alert("Please enter an ID/Passport number to search.");
+        const identity = customerRequest.identityNumber?.trim();
+        const phone = customerRequest.phoneNumber?.trim();
+        if (!identity && !phone) {
+            alert("Please enter Identity Number or Phone Number to search.");
             return;
         }
 
-        setIsSearching(true); // Bật hiệu ứng xoay cho nút Search
+        setIsSearching(true);
         try {
-            const customerResponse = await customerApi.getCustomerByIdentityCard(customerRequest.identityCard);
-            if (customerResponse) {
-                // Cập nhật nhiều trường cùng lúc vào area state
+            const keyword = identity || phone;
+            const found = await customerApi.searchCustomer(keyword);
+            if (found) {
                 setReservationRequest((prev) => ({
                     ...prev,
                     customerRequest: {
                         ...prev.customerRequest,
-                        customerId: customerResponse.id,
-                        fullName: customerResponse.fullName,
-                        phoneNumber: customerResponse.phoneNumber,
-                        email: customerResponse.email,
-                    }
+                        customerId: found.id,
+                        fullName: found.fullName,
+                        phoneNumber: found.phoneNumber,
+                        email: found.email,
+                        identityNumber: found.identityCard ?? found.identityNumber ?? prev.customerRequest.identityNumber,
+                    },
                 }));
             } else {
-                alert("Customer not found. Please check the ID/Passport number and try again.");
+                alert("Customer not found. Please enter customer details manually.");
             }
         } catch (error) {
             console.error("Search customer error:", error);
         } finally {
-            setIsSearching(false); // Tắt hiệu ứng
+            setIsSearching(false);
         }
     };
+
+    const updateNote = (value) => {
+        setReservationRequest((prev) => ({
+            ...prev,
+            note: value,
+        }));
+    };
+
+    const emailError = customerRequest.email && !EMAIL_REGEX.test(customerRequest.email);
+    const phoneError = customerRequest.phoneNumber && !PHONE_REGEX.test(customerRequest.phoneNumber);
 
     return (
             <SectionCard title="3. Customer Information">
@@ -73,11 +80,12 @@ export const CustomerInfo = () => {
                         <Stack gap="sm">
                             <Group gap="xs" align="flex-end">
                                 <TextInput
-                                    label="Customer email"
-                                    placeholder="Enter registered email..."
-                                        value={customerRequest.identityCard}
-                                        onChange={(e) => updateCustomerRequest("identityCard", e.target.value)}
+                                        label="Identity Number"
+                                        placeholder="ID Card / Passport (max 20 chars)"
+                                        value={customerRequest.identityNumber || ""}
+                                        onChange={(e) => updateCustomerRequest("identityNumber", e.currentTarget.value)}
                                         onKeyDown={(e) => e.key === "Enter" && searchCustomerHandler()}
+                                        maxLength={20}
                                         style={{flex: 1}}
                                         radius="md"
                                         disabled={isSearching || isAreaLoading}
@@ -86,7 +94,6 @@ export const CustomerInfo = () => {
                                         variant="light"
                                         onClick={searchCustomerHandler}
                                         leftSection={<IconSearch size={16}/>}
-                                        // Kết hợp cả 2 trạng thái loading
                                         loading={isSearching}
                                         disabled={isAreaLoading}
                                 >
@@ -95,49 +102,60 @@ export const CustomerInfo = () => {
                             </Group>
 
                             <TextInput
-                                    label="Full Name"
-                                    value={reservationRequest.customerRequest?.fullName ?? ""}
+                                    label="Name"
+                                    placeholder="Full name (max 100 chars)"
+                                    value={customerRequest.fullName || ""}
+                                    onChange={(e) => updateCustomerRequest("fullName", e.currentTarget.value)}
+                                    maxLength={100}
                                     radius="md"
-                                    readOnly // Thường thông tin search được nên để read-only
+                                    required
                                     disabled={isSearching || isAreaLoading}
                             />
 
-                            <Grid>
-                                <Grid.Col span={6}>
-                                    <TextInput
-                                            label="Phone Number"
-                                            value={reservationRequest.customerRequest?.phoneNumber ?? ""}
-                                            onChange={(e) => updateCustomerRequest("phoneNumber", e.currentTarget.value)}
-                                            placeholder="Enter phone number..."
-                                            radius="md"
-                                            disabled={isSearching || isAreaLoading}
-                                    />
-                                </Grid.Col>
-                                <Grid.Col span={6}>
-                                    <TextInput
-                                            label="Email"
-                                            value={reservationRequest.customerRequest?.email ?? ""}
-                                            onChange={(e) => updateCustomerRequest("email", e.currentTarget.value)}
-                                            placeholder="Enter email..."
-                                            radius="md"
-                                            disabled={isSearching || isAreaLoading}
-                                    />
-                                </Grid.Col>
-                            </Grid>
+                            <TextInput
+                                    label="Phone Number"
+                                    placeholder="Numbers only (max 15)"
+                                    value={customerRequest.phoneNumber || ""}
+                                    onChange={(e) => {
+                                        const v = e.currentTarget.value;
+                                        if (PHONE_REGEX.test(v)) {
+                                            updateCustomerRequest("phoneNumber", v);
+                                        }
+                                    }}
+                                    maxLength={15}
+                                    radius="md"
+                                    required
+                                    error={phoneError ? "Only numbers allowed" : false}
+                                    disabled={isSearching || isAreaLoading}
+                            />
+
+                            <TextInput
+                                    label="Email"
+                                    placeholder="example@email.com"
+                                    value={customerRequest.email || ""}
+                                    onChange={(e) => updateCustomerRequest("email", e.currentTarget.value)}
+                                    maxLength={50}
+                                    radius="md"
+                                    error={emailError ? "Invalid email format" : false}
+                                    disabled={isSearching || isAreaLoading}
+                            />
                         </Stack>
                     </Grid.Col>
 
                     <Grid.Col span={{base: 12, sm: 5}}>
                         <Textarea
-                                label="Order Note"
-                                placeholder="Special requests (room preference, transfer, etc.)"
-                                value={reservationRequest.note}
-                                onChange={(e) => updateReservationRequest("note", e.target.value)}
-                                onBlur={(e) => setReservationRequest(prev => ({...prev, note: e.target.value}))}
+                                label="Note"
+                                placeholder="Special requests (max 500 chars)"
+                                value={reservationRequest.note || ""}
+                                onChange={(e) => updateNote(e.currentTarget.value)}
+                                maxLength={500}
                                 minRows={7}
                                 radius="md"
                                 disabled={isSearching || isAreaLoading}
                         />
+                        <Text size="xs" c="dimmed" ta="right" mt={4}>
+                            {(reservationRequest.note || "").length}/500
+                        </Text>
                     </Grid.Col>
                 </Grid>
             </SectionCard>

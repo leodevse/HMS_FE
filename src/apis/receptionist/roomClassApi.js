@@ -17,15 +17,17 @@ export const roomClassApi = {
 	 *
 	 * @param {string} checkInDate - Ngày check-in (định dạng YYYY-MM-DD)
 	 * @param {string} checkOutDate - Ngày check-out (định dạng YYYY-MM-DD)
+	 * @param {number|null} excludeReservationId - Reservation ID cần loại trừ (khi edit, để phòng đang edit không bị tính là booked)
 	 * @return {Promise<RoomClassAvailabilityResponse[]>} - Một Promise trả về một mảng đối tượng chứa thông tin về hạng phòng và số phòng còn trống
 	 */
-	getAvailableRooms: async (checkInDate, checkOutDate) => {
+	getAvailableRooms: async (checkInDate, checkOutDate, excludeReservationId = null) => {
 		const [classesResponse, availabilityResponse] = await Promise.all([
 			axiosInstance.get("/catalog/room-classes", { params: { size: 200 } }),
 			axiosInstance.get("/bookings/availability", {
 			params: {
 				checkInDate: toDateOnly(checkInDate),
 				checkOutDate: toDateOnly(checkOutDate),
+				...(excludeReservationId && { excludeReservationId }),
 			},
 			}),
 		]);
