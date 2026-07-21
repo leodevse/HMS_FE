@@ -1,9 +1,12 @@
 import {useEffect, useState} from 'react';
 import {
     Anchor,
+    Badge,
     Button,
+    Divider,
     Group,
     Modal,
+    MultiSelect,
     NumberInput,
     Pagination,
     Paper,
@@ -12,15 +15,12 @@ import {
     Text,
     TextInput,
     Title,
-    Badge,
-    Divider,
     Tooltip,
-    MultiSelect,
 } from '@mantine/core';
 import {useForm} from '@mantine/form';
 import {modals} from '@mantine/modals';
 import {notifications} from '@mantine/notifications';
-import {IconPlus, IconSearch,} from '@tabler/icons-react';
+import {IconPlus, IconSearch} from '@tabler/icons-react';
 import {roomTypeApi} from '../../apis/admin/roomTypeApi';
 
 const PAGE_SIZE = 7;
@@ -146,7 +146,7 @@ function RoomTypeFormModal({opened, mode, initialValues, onClose, onSubmit}) {
                         <MultiSelect
                                 label="Amenities"
                                 placeholder="Select amenities"
-                                data={AMENITY_OPTIONS.map(a => ({value: a.value, label: `${a.emoji} ${a.label}`}))}
+                                data={AMENITY_OPTIONS.map((a) => ({value: a.value, label: `${a.emoji} ${a.label}`}))}
                                 {...form.getInputProps('amenities')}
                         />
 
@@ -184,23 +184,25 @@ function RoomTypeDetailsModal({opened, roomType, onClose}) {
                         <Text fw={600}>Extra Person Fee</Text>
                         <Text>{formatPrice(roomType.extraPersonFee)}</Text>
                     </Group>
-                    {roomType.amenities?.length > 0 && (
-                        <div>
-                            <Text fw={600} mb={8}>Amenities</Text>
-                            <Group gap={6}>
-                                {roomType.amenities.map((a) => {
-                                    const opt = AMENITY_OPTIONS.find(o => o.value === a);
-                                    return opt ? (
-                                        <Badge key={a} color={amenityColors[a] || 'blue'} variant="light">
-                                            {opt.emoji} {opt.label}
-                                        </Badge>
-                                    ) : (
-                                        <Badge key={a} color="gray" variant="light">{a}</Badge>
-                                    );
-                                })}
-                            </Group>
-                        </div>
-                    )}
+                    <Stack gap="xs">
+                        <Text fw={600}>Amenities</Text>
+                        <Group gap="xs">
+                            {(roomType.amenities || []).length > 0 ? (
+                                    roomType.amenities.map((a) => {
+                                        const opt = AMENITY_OPTIONS.find((o) => o.value === a);
+                                        return opt ? (
+                                                <Badge key={a} color={amenityColors[a] || 'blue'} variant="light">
+                                                    {opt.emoji} {opt.label}
+                                                </Badge>
+                                        ) : (
+                                                <Badge key={a} color="gray" variant="light">{a}</Badge>
+                                        );
+                                    })
+                            ) : (
+                                    <Text c="dimmed" size="sm">No amenities</Text>
+                            )}
+                        </Group>
+                    </Stack>
                 </Stack>
             </Modal>
     );
@@ -209,23 +211,23 @@ function RoomTypeDetailsModal({opened, roomType, onClose}) {
 function AmenitiesBadges({amenities}) {
     if (!amenities || amenities.length === 0) return <Text size="sm" c="dimmed">—</Text>;
     return (
-        <Group gap={4} wrap="wrap">
-            {amenities.map((a) => {
-                const opt = AMENITY_OPTIONS.find(o => o.value === a);
-                return (
-                    <Tooltip key={a} label={opt?.label || a} withArrow>
-                        <Badge
-                            color={amenityColors[a] || 'blue'}
-                            variant="light"
-                            size="sm"
-                            style={{cursor: 'default'}}
-                        >
-                            {opt?.emoji || a}
-                        </Badge>
-                    </Tooltip>
-                );
-            })}
-        </Group>
+            <Group gap={4} wrap="wrap">
+                {amenities.map((a) => {
+                    const opt = AMENITY_OPTIONS.find((o) => o.value === a);
+                    return (
+                            <Tooltip key={a} label={opt?.label || a} withArrow>
+                                <Badge
+                                        color={amenityColors[a] || 'blue'}
+                                        variant="light"
+                                        size="sm"
+                                        style={{cursor: 'default'}}
+                                >
+                                    {opt?.emoji || a}
+                                </Badge>
+                            </Tooltip>
+                    );
+                })}
+            </Group>
     );
 }
 
@@ -281,11 +283,6 @@ export default function RoomTypesPage() {
         setModalMode('edit');
         setSelectedRoomType({...emptyRoomType, ...roomType});
         setFormOpened(true);
-    };
-
-    const openDetailsModal = (roomType) => {
-        setSelectedRoomType(roomType);
-        setDetailsOpened(true);
     };
 
     const handleSubmit = (values) => {
@@ -442,15 +439,15 @@ export default function RoomTypesPage() {
                     </div>
 
                     {totalPages > 1 && (
-                        <Group justify="flex-end" mt="md">
-                            <Pagination
-                                value={page}
-                                onChange={setPage}
-                                total={totalPages}
-                                size="sm"
-                                withEdges
-                            />
-                        </Group>
+                            <Group justify="flex-end" mt="md">
+                                <Pagination
+                                        value={page}
+                                        onChange={setPage}
+                                        total={totalPages}
+                                        size="sm"
+                                        withEdges
+                                />
+                            </Group>
                     )}
                 </Paper>
 

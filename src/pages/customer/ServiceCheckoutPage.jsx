@@ -268,12 +268,12 @@ export default function ServiceCheckoutPage() {
                                 </Alert>
                         ) : activeRooms.length === 0 ? (
                                 <Alert icon={<IconInfoCircle size={16}/>} color="orange" mb="lg">
-                                    You haven't checked in yet or your booking hasn't been confirmed, so you cannot book
-                                    services to your room at this time.
+                                    No rooms found for your bookings. Book a room first (with an assigned room number),
+                                    or ask reception to check you in if your stay is already confirmed.
                                 </Alert>
                         ) : (
                                 <Text c="dimmed" mb="md" size="sm">
-                                    Please allocate the services and quantities to the rooms you are currently using:
+                                    Allocate services to a room from your PENDING or IN_HOUSE bookings:
                                 </Text>
                         )}
 
