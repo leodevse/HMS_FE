@@ -127,6 +127,9 @@ export default function StaffManagementPage() {
                     <Title order={1}>Staff Management</Title>
                     <Text size="md" c="dimmed">Staff Directory</Text>
                 </div>
+                <Button leftIcon={<IconPlus />} onClick={openCreate}>
+                    Add Staff
+                </Button>
             </Group>
 
             <Paper shadow="sm" p="md" mb="xl" radius="md" withBorder>
