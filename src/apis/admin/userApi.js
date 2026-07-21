@@ -11,31 +11,37 @@ const normalizeUser = (user = {}) => ({
 
 export const userApi = {
     // Lấy danh sách khách hàng phân trang + filter
-    getCustomersPage: async (params) => {
+    getUsersPage: async (params) => {
         const response = await axiosInstance.get(API_URL, {
             params: {
                 page: params?.page ?? 0,
                 size: params?.size ?? 6,
-                role: 'CUSTOMER',
+                role: params?.role,
                 isActive: params?.isActive,
+                email: params?.email,
+                name: params?.name,
+                id: params?.id,
             },
         });
         const payload = response.data || {};
-        const keyword = String(params?.email || '').trim().toLowerCase();
-        const content = (Array.isArray(payload.content) ? payload.content : [])
-            .map(normalizeUser)
-            .filter((user) => !keyword || user.email.toLowerCase().includes(keyword));
+        const content = (Array.isArray(payload.content) ? payload.content : []).map(normalizeUser);
         return {
             ...payload,
             content,
-            totalElements: keyword ? content.length : (payload.totalElements ?? content.length),
-            totalPages: keyword ? 1 : (payload.totalPages ?? 1),
+            totalElements: payload.totalElements ?? content.length,
+            totalPages: payload.totalPages ?? 1,
         };
     },
 
     // Cập nhật trạng thái Active/Disable của user
     updateUserStatus: async (id, isActive) => {
         const response = await axiosInstance.put(`${API_URL}/${id}`, { active: isActive });
+        return normalizeUser(response.data);
+    },
+
+    // Cập nhật thông tin user
+    updateUser: async (id, payload) => {
+        const response = await axiosInstance.put(`${API_URL}/${id}`, payload);
         return normalizeUser(response.data);
     },
 

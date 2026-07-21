@@ -21,7 +21,11 @@ function toUiService(item) {
         serviceCategory: categoryEnumToLabel[item.category] || item.category,
         price: Number(item.unitPrice || 0),
         description: item.description || '',
-        isActive: true,
+        duration: item.duration || item.serviceDuration || '-',
+        availability: typeof item.available !== 'undefined'
+            ? (item.available ? 'Yes' : 'No')
+            : (item.isActive || item.active ? 'Yes' : 'No'),
+        isActive: item.isActive ?? item.active ?? true,
     };
 }
 
@@ -47,6 +51,8 @@ export const adminServiceApi = {
             unitPrice: Number(data.price),
             category: categoryLabelToEnum[data.serviceCategory] || data.serviceCategory,
             description: data.description || null,
+            duration: data.duration || null,
+            available: data.availability === 'Yes',
         };
 
         const response = await axiosInstance.post(API_URL, payload);
@@ -59,6 +65,8 @@ export const adminServiceApi = {
             unitPrice: Number(data.price),
             category: categoryLabelToEnum[data.serviceCategory] || data.serviceCategory,
             description: data.description || null,
+            duration: data.duration || null,
+            available: data.availability === 'Yes',
         };
 
         const response = await axiosInstance.put(`${API_URL}/${id}`, payload);

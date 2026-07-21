@@ -346,7 +346,10 @@ export default function RoomManagementPage() {
     return (
             <Stack gap="lg">
                 <Group justify="space-between" align="center">
-                    <Title order={1}>Manage Rooms</Title>
+                    <div>
+                        <Title order={1}>Manage Rooms</Title>
+                    </div>
+
                     <Button leftSection={<IconPlus size={16}/>} onClick={openCreateModal}>
                         + Add New Room
                     </Button>
@@ -422,10 +425,20 @@ export default function RoomManagementPage() {
                                                             size="sm"
                                                             c="blue"
                                                             fw={500}
+                                                            onClick={() => openEditModal(room)}
+                                                            style={{cursor: 'pointer'}}
+                                                    >
+                                                        Edit
+                                                    </Anchor>
+                                                    <Text size="sm" c="dimmed">|</Text>
+                                                    <Anchor
+                                                            size="sm"
+                                                            c="blue"
+                                                            fw={500}
                                                             onClick={() => openDetailsModal(room)}
                                                             style={{cursor: 'pointer'}}
                                                     >
-                                                        View/Edit
+                                                        View
                                                     </Anchor>
                                                     <Text size="sm" c="dimmed">|</Text>
                                                     <Anchor

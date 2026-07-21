@@ -3,13 +3,13 @@ import { Modal, Text, Grid, Badge, Stack, Table, Title, Divider } from '@mantine
 export function UserDetailModal({ opened, onClose, user }) {
     if (!user) return null;
 
-    // Hàm format timestamp sang ngày tháng hiển thị
+    // Format timestamp to display date
     const formatDate = (timestamp) => {
         if (!timestamp) return 'N/A';
-        return new Date(timestamp).toLocaleDateString('vi-VN');
+        return new Date(timestamp).toLocaleDateString('en-US');
     };
 
-    // Hàm chọn màu badge dựa trên trạng thái đặt phòng
+    // Choose badge color based on reservation status
     const getStatusColor = (status) => {
         switch (status) {
             case 'CONFIRMED': return 'green';
@@ -22,34 +22,34 @@ export function UserDetailModal({ opened, onClose, user }) {
     };
 
     return (
-        <Modal opened={opened} onClose={onClose} title="Chi tiết Người dùng" size="xl" radius="md">
+        <Modal opened={opened} onClose={onClose} title="User Details" size="xl" radius="md">
             <Stack spacing="sm">
-                <Title order={5} c="blue">Thông tin cá nhân</Title>
+                <Title order={5} c="blue">Personal Information</Title>
                 <Grid>
                     <Grid.Col span={{ base: 6, md: 3 }}><Text fw={500}>ID:</Text></Grid.Col>
                     <Grid.Col span={{ base: 6, md: 3 }}><Text>{user.id}</Text></Grid.Col>
 
-                    <Grid.Col span={{ base: 6, md: 3 }}><Text fw={500}>Họ và tên:</Text></Grid.Col>
-                    <Grid.Col span={{ base: 6, md: 3 }}><Text>{user.fullName || 'Chưa cập nhật'}</Text></Grid.Col>
+                    <Grid.Col span={{ base: 6, md: 3 }}><Text fw={500}>Name:</Text></Grid.Col>
+                    <Grid.Col span={{ base: 6, md: 3 }}><Text>{user.fullName || 'Not updated'}</Text></Grid.Col>
 
                     <Grid.Col span={{ base: 6, md: 3 }}><Text fw={500}>Email:</Text></Grid.Col>
                     <Grid.Col span={{ base: 6, md: 3 }}><Text>{user.email}</Text></Grid.Col>
 
-                    <Grid.Col span={{ base: 6, md: 3 }}><Text fw={500}>Số điện thoại:</Text></Grid.Col>
-                    <Grid.Col span={{ base: 6, md: 3 }}><Text>{user.phoneNumber || 'Chưa cập nhật'}</Text></Grid.Col>
+                    <Grid.Col span={{ base: 6, md: 3 }}><Text fw={500}>Phone:</Text></Grid.Col>
+                    <Grid.Col span={{ base: 6, md: 3 }}><Text>{user.phoneNumber || 'Not updated'}</Text></Grid.Col>
 
-                    <Grid.Col span={{ base: 6, md: 3 }}><Text fw={500}>CCCD/CMND:</Text></Grid.Col>
-                    <Grid.Col span={{ base: 6, md: 3 }}><Text>{user.identityCard || 'Chưa cập nhật'}</Text></Grid.Col>
+                    <Grid.Col span={{ base: 6, md: 3 }}><Text fw={500}>Identity Card:</Text></Grid.Col>
+                    <Grid.Col span={{ base: 6, md: 3 }}><Text>{user.identityCard || 'Not updated'}</Text></Grid.Col>
 
-                    <Grid.Col span={{ base: 6, md: 3 }}><Text fw={500}>Provider (Nguồn):</Text></Grid.Col>
+                    <Grid.Col span={{ base: 6, md: 3 }}><Text fw={500}>Provider:</Text></Grid.Col>
                     <Grid.Col span={{ base: 6, md: 3 }}><Text>{user.provider || 'LOCAL'}</Text></Grid.Col>
 
-                    <Grid.Col span={{ base: 6, md: 3 }}><Text fw={500}>Vai trò (Role):</Text></Grid.Col>
+                    <Grid.Col span={{ base: 6, md: 3 }}><Text fw={500}>Role:</Text></Grid.Col>
                     <Grid.Col span={{ base: 6, md: 3 }}>
                         <Badge color="violet" variant="light">{user.role}</Badge>
                     </Grid.Col>
 
-                    <Grid.Col span={{ base: 6, md: 3 }}><Text fw={500}>Trạng thái:</Text></Grid.Col>
+                    <Grid.Col span={{ base: 6, md: 3 }}><Text fw={500}>Status:</Text></Grid.Col>
                     <Grid.Col span={{ base: 6, md: 3 }}>
                         <Badge color={user.isActive ? 'green' : 'red'}>
                             {user.isActive ? 'Active' : 'Disabled'}
@@ -59,15 +59,15 @@ export function UserDetailModal({ opened, onClose, user }) {
 
                 <Divider my="md" />
 
-                <Title order={5} c="blue">Lịch sử đặt phòng ({user.reservations?.length || 0})</Title>
+                <Title order={5} c="blue">Reservation History ({user.reservations?.length || 0})</Title>
                 <Table striped highlightOnHover withTableBorder>
                     <Table.Thead>
                         <Table.Tr>
-                            <Table.Th>Mã Booking</Table.Th>
-                            <Table.Th>Ngày nhận (Check-in)</Table.Th>
-                            <Table.Th>Ngày trả (Check-out)</Table.Th>
-                            <Table.Th>Số khách</Table.Th>
-                            <Table.Th>Trạng thái</Table.Th>
+                            <Table.Th>Booking Code</Table.Th>
+                            <Table.Th>Check-in</Table.Th>
+                            <Table.Th>Check-out</Table.Th>
+                            <Table.Th>Guests</Table.Th>
+                            <Table.Th>Status</Table.Th>
                         </Table.Tr>
                     </Table.Thead>
                     <Table.Tbody>
@@ -88,7 +88,7 @@ export function UserDetailModal({ opened, onClose, user }) {
                         ) : (
                             <Table.Tr>
                                 <Table.Td colSpan={5} style={{ textAlign: 'center', padding: '1rem' }}>
-                                    <Text c="dimmed">Khách hàng này chưa có đơn đặt phòng nào.</Text>
+                                    <Text c="dimmed">This customer has no reservations yet.</Text>
                                 </Table.Td>
                             </Table.Tr>
                         )}
