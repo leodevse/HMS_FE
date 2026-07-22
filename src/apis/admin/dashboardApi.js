@@ -1,4 +1,5 @@
 import axiosInstance from '../axiosConfig';
+import { reservationApi } from './reservationApi';
 
 export const dashboardApi = {
     getDashboardData: async () => {
@@ -10,9 +11,26 @@ export const dashboardApi = {
             axiosInstance.get('/auth/users', { params: { page: 0, size: 1, isActive: true, role: 'ADMIN' } }),
             axiosInstance.get('/auth/users', { params: { page: 0, size: 1, isActive: true, role: 'RECEPTIONIST' } }),
             axiosInstance.get('/auth/users', { params: { page: 0, size: 1, isActive: true, role: 'HOUSEKEEPING' } }),
-            axiosInstance.get('/auth/users', { params: { page: 0, size: 1, role: 'CUSTOMER' } }),
-            axiosInstance.get('/bookings/reservations', { params: { page: 0, size: 1 } }),
+            // increase page size for customers to reliably count total when backend doesn't return totalElements
+            // fetch customers only (original behavior)
+            axiosInstance.get('/auth/users', { params: { page: 0, size: 5000, role: 'CUSTOMER' } }),
+            // we will fetch recent reservations separately using reservationApi to get normalized data
         ]);
+
+        // Debug: log raw responses to help diagnose mismatched counts
+        try {
+            // eslint-disable-next-line no-console
+            console.debug('dashboardApi responses', {
+                stats: statsResponse?.data,
+                rooms: roomsResponse?.data,
+                admin: adminResponse?.data,
+                receptionist: receptionistResponse?.data,
+                housekeeping: housekeepingResponse?.data,
+                customer: customerResponse?.data,
+            });
+        } catch (e) {
+            // ignore logging errors
+        }
 
         const reservationStats = statsResponse.data || {};
         const roomPayload = roomsResponse.data;
@@ -28,9 +46,38 @@ export const dashboardApi = {
             return counts;
         }, {});
 
-        const totalStaff = [adminResponse, receptionistResponse, housekeepingResponse].reduce((sum, response) => sum + Number(response.data?.totalElements ?? 0), 0);
-        const currentGuests = Number(customerResponse.data?.totalElements ?? 0);
-        const bookingsToday = Number(reservationResponse.data?.totalElements ?? 0);
+        const extractTotal = (response) => {
+            if (!response) return 0;
+            const data = response.data;
+            if (data == null) return 0;
+                if (typeof data.totalElements !== 'undefined') return Number(data.totalElements || 0);
+                if (Array.isArray(data)) return data.length;
+                if (Array.isArray(data.content)) return data.content.length;
+                // Common nested array keys some backends use
+                const nestedKeys = ['data', 'items', 'results', 'users', 'rows'];
+                for (const key of nestedKeys) {
+                    if (Array.isArray(data[key])) return data[key].length;
+                }
+                // If object has a paged structure under 'data' with content
+                if (data.data && Array.isArray(data.data.content)) return data.data.content.length;
+                return 0;
+        };
+
+        const totalStaff = [adminResponse, receptionistResponse, housekeepingResponse].reduce((sum, response) => sum + extractTotal(response), 0);
+
+        // original behavior: use totalElements (or content length) from customerResponse
+        const currentGuests = extractTotal(customerResponse);
+        let bookingsToday = 0;
+
+        // Fetch recent reservations (normalized) using reservationApi
+        let recentBookings = [];
+        try {
+            const reservationPage = await reservationApi.getReservations({ page: 0, size: 5 });
+            recentBookings = Array.isArray(reservationPage.content) ? reservationPage.content : [];
+            bookingsToday = Number(reservationPage.totalElements ?? bookingsToday);
+        } catch (err) {
+            // ignore and keep recentBookings empty
+        }
 
         return {
             stats: {
@@ -49,7 +96,7 @@ export const dashboardApi = {
                 bookingsToday,
                 roomTypeCounts,
             },
-            recentBookings: [],
+            recentBookings,
         };
     },
 };
