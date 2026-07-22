@@ -76,32 +76,79 @@ export default function AdminDashboardPage() {
 
     const colorPalette = ['blue', 'green', 'teal', 'orange', 'violet', 'red', 'cyan', 'grape'];
 
-    const roomTypes = statsData?.roomTypeCounts
-        ? Object.entries(statsData.roomTypeCounts).map(([label, value], index) => ({
-            label,
-            value,
-            color: colorPalette[index % colorPalette.length],
-        }))
-        : [
-            { label: 'Deluxe Room', value: 0, color: 'blue' },
-            { label: 'Family Room', value: 0, color: 'green' },
-            { label: 'Standard Room', value: 0, color: 'teal' },
-        ];
+    const KNOWN_ROOM_TYPES = [
+        { key: 'Deluxe', label: 'Deluxe Room' },
+        { key: 'Suite', label: 'Suite' },
+        { key: 'Family', label: 'Family Room' },
+        { key: 'Standard', label: 'Standard Room' },
+    ];
+
+    let roomTypes = [];
+    if (statsData?.roomTypeCounts) {
+        const seen = new Set();
+        // Start with known types in desired order, using counts from API when available
+        roomTypes = KNOWN_ROOM_TYPES.map((t, idx) => {
+            const value = statsData.roomTypeCounts[t.key] ?? statsData.roomTypeCounts[t.label] ?? 0;
+            seen.add(t.key);
+            seen.add(t.label);
+            return {
+                label: t.label,
+                value,
+                color: colorPalette[idx % colorPalette.length],
+            };
+        });
+
+        // Append any additional types returned by API that are not in KNOWN_ROOM_TYPES
+        Object.entries(statsData.roomTypeCounts).forEach(([label, value]) => {
+            if (seen.has(label)) return;
+            roomTypes.push({ label, value, color: colorPalette[roomTypes.length % colorPalette.length] });
+        });
+    } else {
+        roomTypes = KNOWN_ROOM_TYPES.slice(0, 3).map((t, idx) => ({ label: t.label, value: 0, color: colorPalette[idx % colorPalette.length] }));
+    }
 
     const roomTypeTotal = roomTypes.reduce((sum, roomType) => sum + roomType.value, 0);
-    const pieCircumference = 2 * Math.PI * 16;
-    const pieSegments = [];
-    let pieOffset = 0;
-
+    // Build donut slice path data for each room type
+    const donutSegments = [];
     if (roomTypeTotal > 0) {
+        let currentAngle = -90; // start at top
+        const toDegrees = (v) => (v / roomTypeTotal) * 360;
+
+        const polarToCartesian = (cx, cy, r, angleDeg) => {
+            const angleRad = (angleDeg * Math.PI) / 180.0;
+            return { x: cx + r * Math.cos(angleRad), y: cy + r * Math.sin(angleRad) };
+        };
+
+        const describeDonutSlice = (cx, cy, rOuter, rInner, startAngle, endAngle) => {
+            const startOuter = polarToCartesian(cx, cy, rOuter, endAngle);
+            const endOuter = polarToCartesian(cx, cy, rOuter, startAngle);
+            const startInner = polarToCartesian(cx, cy, rInner, endAngle);
+            const endInner = polarToCartesian(cx, cy, rInner, startAngle);
+
+            const largeArcFlag = endAngle - startAngle <= 180 ? '0' : '1';
+
+            return [
+                'M', startOuter.x, startOuter.y,
+                'A', rOuter, rOuter, 0, largeArcFlag, 0, endOuter.x, endOuter.y,
+                'L', endInner.x, endInner.y,
+                'A', rInner, rInner, 0, largeArcFlag, 1, startInner.x, startInner.y,
+                'Z'
+            ].join(' ');
+        };
+
         roomTypes.forEach((roomType) => {
-            const segmentLength = (roomType.value / roomTypeTotal) * pieCircumference;
-            pieSegments.push({
+            const sweep = toDegrees(roomType.value);
+            const startAngle = currentAngle;
+            const endAngle = currentAngle + sweep;
+
+            donutSegments.push({
                 ...roomType,
-                dashArray: `${segmentLength} ${pieCircumference - segmentLength}`,
-                dashOffset: pieOffset,
+                startAngle,
+                endAngle,
+                path: describeDonutSlice(16, 16, 16, 10, startAngle, endAngle),
             });
-            pieOffset -= segmentLength;
+
+            currentAngle = endAngle;
         });
     }
 
@@ -209,27 +256,16 @@ export default function AdminDashboardPage() {
                         <Box style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
                             <Box style={{ width: 200, height: 200, position: 'relative' }}>
                                 <svg viewBox="0 0 32 32" style={{ width: '100%', height: '100%' }}>
-                                    {pieSegments.map((segment) => (
-                                        <circle
-                                            key={segment.label}
-                                            r="16"
-                                            cx="16"
-                                            cy="16"
-                                            fill="transparent"
-                                            stroke={segment.color}
-                                            strokeWidth="8"
-                                            strokeDasharray={segment.dashArray}
-                                            strokeDashoffset={segment.dashOffset}
-                                            transform="rotate(-90 16 16)"
-                                            strokeLinecap="butt"
+                                    {donutSegments.map((seg, idx) => (
+                                        <path
+                                            key={seg.label + idx}
+                                            d={seg.path}
+                                            fill={seg.color}
+                                            stroke="white"
+                                            strokeWidth="0.2"
                                         />
                                     ))}
-                                    <circle
-                                        r="10"
-                                        cx="16"
-                                        cy="16"
-                                        fill="white"
-                                    />
+                                    <circle r="10" cx="16" cy="16" fill="white" />
                                 </svg>
                                 <Box style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center' }}>
                                     <Text size="sm" c="dimmed">Total</Text>
