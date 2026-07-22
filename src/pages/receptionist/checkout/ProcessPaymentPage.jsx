@@ -8,7 +8,6 @@ import {
     Divider,
     Group,
     Loader,
-    NumberInput,
     Select,
     Stack,
     Table,
@@ -41,10 +40,8 @@ const fmtDateTime = (v) => {
 };
 
 const PAYMENT_METHODS = [
-    {value: 'VIETQR', label: 'VietQR'},
     {value: 'CASH', label: 'Cash'},
     {value: 'CARD', label: 'Card'},
-    {value: 'TRANSFER', label: 'Bank Transfer'},
 ];
 
 export const ProcessPaymentPage = () => {
@@ -54,8 +51,7 @@ export const ProcessPaymentPage = () => {
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
     const [selectedItems, setSelectedItems] = useState({});
-    const [depositToApply, setDepositToApply] = useState(0);
-    const [paymentMethod, setPaymentMethod] = useState('VIETQR');
+    const [paymentMethod, setPaymentMethod] = useState('CASH');
     const initialLoadStarted = useRef(false);
 
     const load = useCallback(async () => {
@@ -63,7 +59,6 @@ export const ProcessPaymentPage = () => {
         try {
             const data = await paymentApi.getCheckoutSummary(id);
             setSummary(data);
-            setDepositToApply(Math.min(Number(data.deposit || 0), Number(data.balance || 0)));
             // Select all items by default
             const initSelected = {};
             (data.items || []).forEach((item, idx) => {
@@ -84,19 +79,19 @@ export const ProcessPaymentPage = () => {
     }, [load]);
 
     const folioItems = summary?.items || [];
-    const totalDeposit = Number(summary?.deposit || 500000); // fallback for demo
     const selectedTotal = folioItems.reduce((sum, item, idx) =>
         sum + (selectedItems[idx] ? Number(item.amount || 0) : 0), 0
     );
-    const depositApplied = Math.min(Number(depositToApply || 0), selectedTotal);
-    const amountToPay = Math.max(0, selectedTotal - depositApplied);
+    const totalPaid = Number(summary?.totalPaid || 0);
+    const outstandingBalance = Math.max(0, Number(summary?.balance || 0));
+    const amountToPay = Math.min(outstandingBalance, selectedTotal);
 
     const toggleItem = (idx) => {
         setSelectedItems(prev => ({...prev, [idx]: !prev[idx]}));
     };
 
     const handleExecuteTrade = async () => {
-        if (amountToPay < 0) return;
+        if (amountToPay <= 0) return;
         setSubmitting(true);
         try {
             await paymentApi.recordPayment({
@@ -145,10 +140,11 @@ export const ProcessPaymentPage = () => {
                     <Box/>
 
                     <Text size="sm">{fmtDateTime(summary.checkInDate)}</Text>
-                    <Text size="sm">
-                        {fmtDateTime(summary.actualCheckInTime || summary.checkInDate)}
-                        {' '}
-                        <Badge size="xs" color="green" variant="light">Valid</Badge>
+                    <Text size="sm" component="div">
+                        <Group gap={6} wrap="nowrap">
+                            <span>{fmtDateTime(summary.actualCheckInTime || summary.checkInDate)}</span>
+                            <Badge size="xs" color="green" variant="light">Valid</Badge>
+                        </Group>
                     </Text>
                     <Box/>
 
@@ -157,10 +153,11 @@ export const ProcessPaymentPage = () => {
                     <Box/>
 
                     <Text size="sm">{fmtDateTime(summary.checkOutDate)}</Text>
-                    <Text size="sm">
-                        {fmtDateTime(new Date().toISOString())}
-                        {' '}
-                        <Badge size="xs" color="orange" variant="light">Late Check-out</Badge>
+                    <Text size="sm" component="div">
+                        <Group gap={6} wrap="nowrap">
+                            <span>{fmtDateTime(new Date().toISOString())}</span>
+                            <Badge size="xs" color="orange" variant="light">Late Check-out</Badge>
+                        </Group>
                     </Text>
                     <Box/>
                 </Box>
@@ -170,7 +167,7 @@ export const ProcessPaymentPage = () => {
             <Card withBorder radius="md" p="lg" mb="md">
                 <Title order={4} mb="md">Folio Details</Title>
                 <Box style={{overflowX: 'auto'}}>
-                    <Table withBorder withColumnBorders verticalSpacing="xs" horizontalSpacing="sm">
+                    <Table withTableBorder withColumnBorders verticalSpacing="xs" horizontalSpacing="sm">
                         <Table.Thead style={{backgroundColor: '#f8f9fa'}}>
                             <Table.Tr>
                                 <Table.Th style={{width: 50}}>Select</Table.Th>
@@ -206,26 +203,19 @@ export const ProcessPaymentPage = () => {
                 </Box>
             </Card>
 
-            {/* Deposit Allocation */}
+            {/* Existing payment information */}
             <Card withBorder radius="md" p="lg" mb="md">
-                <Title order={4} mb="md">Deposit Allocation</Title>
+                <Title order={4} mb="md">Payment Status</Title>
                 <Stack gap="xs">
                     <Group>
-                        <Text size="sm" w={160}><b>Total Deposit:</b></Text>
-                        <Text size="sm">{fmtVND(totalDeposit)}</Text>
+                        <Text size="sm" w={180}><b>Total already paid:</b></Text>
+                        <Text size="sm">{fmtVND(totalPaid)}</Text>
                     </Group>
-                    <Group align="center">
-                        <Text size="sm" w={160}><b>Deposit to Apply:</b></Text>
-                        <NumberInput
-                            value={depositToApply}
-                            onChange={(v) => setDepositToApply(Math.min(Number(v || 0), totalDeposit))}
-                            min={0}
-                            max={totalDeposit}
-                            thousandSeparator=","
-                            style={{width: 180}}
-                            size="sm"
-                            rightSection={<Text size="xs" c="dimmed" pr={4}>VND</Text>}
-                        />
+                    <Group>
+                        <Text size="sm" w={180}><b>Outstanding balance:</b></Text>
+                        <Text size="sm" fw={700} c={outstandingBalance > 0 ? 'red' : 'green'}>
+                            {fmtVND(outstandingBalance)}
+                        </Text>
                     </Group>
                 </Stack>
             </Card>
@@ -239,8 +229,8 @@ export const ProcessPaymentPage = () => {
                         <Text size="sm" fw={500}>{fmtVND(selectedTotal)}</Text>
                     </Group>
                     <Group justify="space-between" maw={400}>
-                        <Text size="sm">Deposit Applied:</Text>
-                        <Text size="sm" fw={500}>{fmtVND(depositApplied)}</Text>
+                        <Text size="sm">Already Paid:</Text>
+                        <Text size="sm" fw={500}>{fmtVND(totalPaid)}</Text>
                     </Group>
                     <Divider maw={400}/>
                     <Group justify="space-between" maw={400}>
@@ -267,7 +257,7 @@ export const ProcessPaymentPage = () => {
                         color="blue"
                         loading={submitting}
                         onClick={handleExecuteTrade}
-                        disabled={amountToPay < 0}
+                        disabled={amountToPay <= 0}
                     >
                         Execute Trade
                     </Button>

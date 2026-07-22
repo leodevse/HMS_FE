@@ -1,5 +1,6 @@
 import axiosInstance from "../axiosConfig";
 import {attachStandardTime} from '../../utils/hotelStayPolicy';
+import {customerApi} from './customerApi';
 
 const normalizeReservation = (reservation = {}) => ({
 	...reservation,
@@ -148,9 +149,11 @@ export const reservationApi = {
 	 */
 	getReservations: async (searchParams) => {
 		const {data} = await axiosInstance.get("/bookings/reservations", {
+			suppressErrorNotification: true,
 			params: {
 				page: searchParams?.page ?? 0,
 				size: searchParams?.size ?? 10,
+				sort: searchParams?.sort || 'id,desc',
 				status: ['PENDING', 'IN_HOUSE', 'CHECKED_OUT', 'CANCELLED'].includes(searchParams?.status)
 					? searchParams.status : undefined,
 			},
@@ -205,8 +208,27 @@ export const reservationApi = {
 	 * @return {Promise<ReservationResponse>} - Một Promise trả về đối tượng chứa thông tin chi tiết của đặt phòng vừa được tạo
 	 */
 	makeReservation: async (reservationRequest) => {
-		const customerId = reservationRequest.customerRequest?.customerId;
-		if (!customerId) throw new Error('Please search and select an existing customer first');
+		const customer = reservationRequest.customerRequest || {};
+		let customerId = customer.customerId;
+		if (!customerId) {
+			const lookupValues = [...new Set([
+				customer.identityNumber,
+				customer.phoneNumber,
+				customer.email,
+			].map((value) => String(value || '').trim()).filter(Boolean))];
+			let existingCustomer = null;
+			for (const lookupValue of lookupValues) {
+				existingCustomer = await customerApi.searchCustomer(lookupValue);
+				if (existingCustomer) break;
+			}
+			if (existingCustomer) {
+				customerId = existingCustomer.id;
+			} else {
+				const newCustomer = await customerApi.createCustomer(customer);
+				customerId = newCustomer.id;
+			}
+		}
+		if (!customerId) throw new Error('Unable to resolve or create the customer profile');
 		const selections = (reservationRequest.roomClassQuantities || []).filter((item) => item.roomClassId);
 		if (!selections.length) throw new Error('Please select at least one room class');
 		if (selections.length !== (reservationRequest.roomClassQuantities || []).length) {

@@ -79,11 +79,20 @@ axiosInstance.interceptors.response.use(
                     break;
                 case 500:
                     notifications.show({
+						id: 'server-error',
                         title: 'Server Error',
                         message: 'Something went wrong. Please try again later.',
                         color: 'red',
                     });
                     break;
+				case 503:
+					notifications.show({
+						id: 'service-unavailable',
+						title: 'Service unavailable',
+						message: 'The requested service is starting or temporarily unavailable. Please try again shortly.',
+						color: 'red',
+					});
+					break;
                 default:
                     notifications.show({
                         title: 'Error',

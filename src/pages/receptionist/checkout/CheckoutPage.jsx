@@ -41,6 +41,13 @@ const fmtDateTime = (v) => {
     }
 };
 
+const fmtHotelDateTime = (date, hour) => {
+    if (!date) return '-';
+    const datePart = String(date).slice(0, 10).split('-');
+    if (datePart.length !== 3) return fmtDateTime(date);
+    return `${datePart[2]}/${datePart[1]}/${datePart[0]} ${String(hour).padStart(2, '0')}:00`;
+};
+
 const CATEGORY_OPTIONS = [
     {value: 'ROOM_CHARGE', label: 'Room Charge'},
     {value: 'SURCHARGE', label: 'Surcharge'},
@@ -159,6 +166,18 @@ export const CheckoutPage = () => {
 
     const isCheckedOut = summary.bookingStatus === 'CHECKED_OUT';
     const balance = Number(summary.balance || 0);
+    const checkoutDeadline = summary.checkOutDate
+        ? new Date(`${String(summary.checkOutDate).slice(0, 10)}T12:00:00`)
+        : null;
+    const isLateCheckout = checkoutDeadline ? new Date() > checkoutDeadline : false;
+
+    const handlePrimaryAction = () => {
+        if (balance > 0) {
+            navigate(`/receptionist/reservations/${id}/process-payment`);
+            return;
+        }
+        finalize();
+    };
 
     return (
         <Box p="xl" maw={1100} mx="auto">
@@ -180,11 +199,15 @@ export const CheckoutPage = () => {
                     <Text size="sm"><b>Actual Check-in Time:</b></Text>
                     <Box/>
 
-                    <Text size="sm">{fmtDateTime(summary.checkInDate)}</Text>
-                    <Text size="sm">
-                        {fmtDateTime(summary.actualCheckInTime || summary.checkInDate)}
+                    <Text size="sm">{fmtHotelDateTime(summary.checkInDate, 14)}</Text>
+                    <Text size="sm" component="div">
+                        <Group gap={6} wrap="nowrap">
+                        <span>{summary.actualCheckInTime
+                            ? fmtDateTime(summary.actualCheckInTime)
+                            : fmtHotelDateTime(summary.checkInDate, 14)}</span>
                         {' '}
                         <Badge size="xs" color="green" variant="light">Valid</Badge>
+                        </Group>
                     </Text>
                     <Box/>
 
@@ -192,11 +215,14 @@ export const CheckoutPage = () => {
                     <Text size="sm"><b>Current Time:</b></Text>
                     <Box/>
 
-                    <Text size="sm">{fmtDateTime(summary.checkOutDate)}</Text>
-                    <Text size="sm">
-                        {fmtDateTime(new Date().toISOString())}
-                        {' '}
-                        <Badge size="xs" color="orange" variant="light">Late Check-out</Badge>
+                    <Text size="sm">{fmtHotelDateTime(summary.checkOutDate, 12)}</Text>
+                    <Text size="sm" component="div">
+                        <Group gap={6} wrap="nowrap">
+                            <span>{fmtDateTime(new Date().toISOString())}</span>
+                            <Badge size="xs" color={isLateCheckout ? 'orange' : 'green'} variant="light">
+                                {isLateCheckout ? 'Late Check-out' : 'On time'}
+                            </Badge>
+                        </Group>
                     </Text>
                     <Box style={{display: 'flex', alignItems: 'center'}}>
                         <Button size="xs" variant="outline">Scan Identity Card</Button>
@@ -208,7 +234,7 @@ export const CheckoutPage = () => {
             <Card withBorder radius="md" p="lg" mb="md">
                 <Title order={4} mb="md">Folio Details</Title>
                 <Box style={{overflowX: 'auto'}}>
-                    <Table withBorder withColumnBorders verticalSpacing="xs" horizontalSpacing="sm">
+                    <Table withTableBorder withColumnBorders verticalSpacing="xs" horizontalSpacing="sm">
                         <Table.Thead style={{backgroundColor: '#f8f9fa'}}>
                             <Table.Tr>
                                 <Table.Th style={{width: 40}}>STT</Table.Th>
@@ -278,7 +304,7 @@ export const CheckoutPage = () => {
                 </Text>
                 {balance > 0 && (
                     <Text size="sm" c="red" mt={4}>
-                        Outstanding balance: {fmtLabel(balance)}
+                        Outstanding balance: {fmtLabel(balance)}. Complete payment before confirming check-out.
                     </Text>
                 )}
             </Card>
@@ -290,10 +316,10 @@ export const CheckoutPage = () => {
                 <Button
                     color="blue"
                     loading={submitting}
-                    disabled={isCheckedOut || balance > 0}
-                    onClick={finalize}
+                    disabled={isCheckedOut}
+                    onClick={handlePrimaryAction}
                 >
-                    Confirm Check-out
+                    {balance > 0 ? 'Proceed to Payment' : 'Confirm Check-out'}
                 </Button>
             </Group>
 

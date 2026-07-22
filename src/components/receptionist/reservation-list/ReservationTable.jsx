@@ -3,6 +3,7 @@
 
 import {Center, Paper, Table, Text} from "@mantine/core";
 import {useEffect} from "react";
+import {notifications} from "@mantine/notifications";
 import {ReservationItem} from "./ReservationItem.jsx";
 import {reservationApi} from "../../../apis/receptionist/reservationApi.js";
 import {useReservationList} from "../../../hooks/common/list/reservation-list-provider.jsx";
@@ -11,16 +12,38 @@ export const ReservationTable = () => {
     const {page: reservationPageResponse, setPage, searchParams, setIsLoading} = useReservationList();
 
     useEffect(() => {
+        let active = true;
+
         (
                 async () => {
                     setIsLoading(true);
                     try {
-                        setPage(await reservationApi.getReservations(searchParams));
+                        const response = await reservationApi.getReservations(searchParams);
+                        if (active) {
+                            setPage(response);
+                            notifications.hide('reservation-list-load-error');
+                        }
+                    } catch (error) {
+                        if (!active) return;
+
+                        const serviceUnavailable = error?.response?.status === 503;
+                        notifications.show({
+                            id: 'reservation-list-load-error',
+                            title: serviceUnavailable ? 'Booking service unavailable' : 'Cannot load reservations',
+                            message: serviceUnavailable
+                                ? 'Booking service is starting or temporarily unavailable. Please wait a moment and try again.'
+                                : error?.response?.data?.message || 'Unable to load the reservation list.',
+                            color: 'red',
+                        });
                     } finally {
-                        setIsLoading(false);
+                        if (active) setIsLoading(false);
                     }
                 }
         )();
+
+        return () => {
+            active = false;
+        };
     }, [searchParams, setPage, setIsLoading]);
 
     /**

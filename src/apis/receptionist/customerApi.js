@@ -51,4 +51,32 @@ export const customerApi = {
     searchByPhone: async (phone) => {
         return customerApi.searchCustomer(phone);
     },
+
+    /** Create a walk-in customer profile and return its new customer ID. */
+    createCustomer: async ({fullName, phoneNumber, email, identityNumber}) => {
+        const normalizedIdentity = String(identityNumber || '').trim();
+        const loginEmail = String(email || '').trim().toLowerCase()
+            || `walkin.${normalizedIdentity || Date.now()}@hotel.local`;
+        const randomPart = globalThis.crypto?.randomUUID?.().replaceAll('-', '').slice(0, 16)
+            || `${Date.now()}${Math.random()}`.replace(/\D/g, '').slice(0, 16);
+
+        const {data} = await axiosInstance.post('/auth/register', {
+            email: loginEmail,
+            password: `Walkin@${randomPart}`,
+            fullName: String(fullName || '').trim(),
+            phoneNumber: String(phoneNumber || '').trim(),
+            identityCard: normalizedIdentity,
+            roleName: 'CUSTOMER',
+            active: true,
+        });
+
+        return {
+            id: data.userId,
+            fullName: data.fullName || fullName,
+            email: data.username || loginEmail,
+            phoneNumber,
+            identityCard: normalizedIdentity,
+            isNew: true,
+        };
+    },
 };

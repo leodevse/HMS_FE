@@ -1,9 +1,10 @@
-import {Button, Grid, Group, Stack, Textarea, Text, TextInput} from "@mantine/core";
+import {Badge, Button, Grid, Group, Stack, Textarea, Text, TextInput} from "@mantine/core";
 import {customerApi} from "../../../apis/receptionist/customerApi";
 import {useMakeReservationArea} from "../../../hooks/common/area/make-reservation-area-provider";
 import {SectionCard} from "../../common/SectionCard";
 import {IconSearch} from "@tabler/icons-react";
 import {useState} from "react";
+import {notifications} from "@mantine/notifications";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE_REGEX = /^[0-9]*$/;
@@ -25,6 +26,7 @@ export const CustomerInfo = () => {
             customerRequest: {
                 ...prev.customerRequest,
                 [field]: value,
+                ...(field === 'identityNumber' ? {customerId: null} : {}),
             },
         }));
     };
@@ -53,8 +55,21 @@ export const CustomerInfo = () => {
                         identityNumber: found.identityCard ?? found.identityNumber ?? prev.customerRequest.identityNumber,
                     },
                 }));
+                notifications.show({
+                    color: 'green',
+                    title: 'Returning customer found',
+                    message: `Using the existing profile of ${found.fullName}`,
+                });
             } else {
-                alert("Customer not found. Please enter customer details manually.");
+                setReservationRequest((prev) => ({
+                    ...prev,
+                    customerRequest: {...prev.customerRequest, customerId: null},
+                }));
+                notifications.show({
+                    color: 'blue',
+                    title: 'New customer',
+                    message: 'No matching profile was found. Enter the details below; a new customer will be created with the reservation.',
+                });
             }
         } catch (error) {
             console.error("Search customer error:", error);
@@ -99,6 +114,17 @@ export const CustomerInfo = () => {
                                 >
                                     Search
                                 </Button>
+                            </Group>
+
+                            <Group gap="xs">
+                                <Badge color={customerRequest.customerId ? 'green' : 'blue'} variant="light">
+                                    {customerRequest.customerId ? 'Returning customer' : 'New customer'}
+                                </Badge>
+                                <Text size="xs" c="dimmed">
+                                    {customerRequest.customerId
+                                        ? `Customer ID: ${customerRequest.customerId}`
+                                        : 'Fill in the information below to create a new profile automatically.'}
+                                </Text>
                             </Group>
 
                             <TextInput
