@@ -31,10 +31,12 @@ export const reservationApi = {
         });
 
         const payload = response.data || {};
+        const content = Array.isArray(payload.content) ? payload.content.map(normalizeReservation) : [];
+        const totalElements = Number(payload.totalElements ?? (Array.isArray(payload.content) ? payload.content.length : 0));
         return {
-            content: Array.isArray(payload.content) ? payload.content.map(normalizeReservation) : [],
+            content,
             totalPages: payload.totalPages || 1,
-            totalElements: payload.totalElements || 0,
+            totalElements: totalElements || 0,
             number: payload.number || 0,
         };
     },

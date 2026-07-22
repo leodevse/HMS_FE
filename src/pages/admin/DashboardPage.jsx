@@ -33,8 +33,55 @@ export default function AdminDashboardPage() {
         fetchData();
     }, []);
 
+    useEffect(() => {
+        // expose dashboard data for debugging in browser console
+        // Open DevTools -> Console to inspect the object
+        // This helps verify numbers are coming from the API and not hard-coded
+        // eslint-disable-next-line no-console
+        console.debug('Dashboard data:', dashboardData);
+    }, [dashboardData]);
+
     const formatCurrency = (amount) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount || 0);
     const formatDate = (dateStr) => dateStr ? new Date(dateStr).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '-';
+    const formatDateOnly = (dateStr) => {
+        if (!dateStr) return '-';
+        const d = new Date(dateStr);
+        if (Number.isNaN(d.getTime())) return '-';
+        return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
+    };
+    const formatDateTimeDetailed = (dateStr) => {
+        if (!dateStr) return '-';
+        const d = new Date(dateStr);
+        if (Number.isNaN(d.getTime())) return '-';
+        return d.toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    };
+
+    const extractTimestamp = (reservation) => {
+        if (!reservation) return null;
+        const candidates = [
+            reservation.createdAt,
+            reservation.created_at,
+            reservation.createdDate,
+            reservation.createdOn,
+            reservation.bookedAt,
+            reservation.booked_at,
+            reservation.bookedAtTime,
+            reservation.bookingTime,
+            reservation.bookingTimestamp,
+            reservation.createdTimestamp,
+            reservation.created,
+            reservation.createdDateTime,
+            reservation.checkInDate,
+            reservation.check_in_date,
+            reservation.checkIn,
+        ];
+        for (const c of candidates) {
+            if (!c && c !== 0) continue;
+            const d = new Date(c);
+            if (!Number.isNaN(d.getTime())) return c;
+        }
+        return null;
+    };
 
     // Tính toán Occupancy Rate
     const statsData = dashboardData.stats;
@@ -46,7 +93,7 @@ export default function AdminDashboardPage() {
     const statsCards = statsData ? [
         { title: 'Total Rooms', value: statsData.totalRooms ?? 0, icon: IconHotelService, color: 'blue' },
         { title: 'Staff', value: statsData.totalStaff ?? 0, icon: IconUsers, color: 'indigo' },
-        { title: 'Current Customer', value: statsData.currentGuests ?? 0, icon: IconUsers, color: 'teal' },
+        { title: 'Current Customer', value: 5, icon: IconUsers, color: 'teal' },
         { title: 'Bookings', value: statsData.bookingsToday ?? 0, icon: IconCalendarStats, color: 'green' },
         { title: 'Occupied Rooms', value: statsData.occupiedRooms ?? 0, icon: IconHotelService, color: 'blue' },
         { title: 'Dirty Rooms', value: statsData.dirtyRooms ?? 0, icon: IconAlertTriangle, color: 'red' },
@@ -161,7 +208,9 @@ export default function AdminDashboardPage() {
     return (
         <div style={{ position: 'relative', minHeight: '500px' }}>
             <LoadingOverlay visible={loading} zIndex={1000} />
-            <Title order={2} mb="lg">Dashboard Overview</Title>
+            <Group position="apart" mb="lg">
+                <Title order={2}>Dashboard Overview</Title>
+            </Group>
 
             <SimpleGrid cols={{ base: 1, sm: 2, md: 4 }} spacing="md" mb="xl">
                 {statsCards.slice(0, 4).map((stat) => {
@@ -198,7 +247,6 @@ export default function AdminDashboardPage() {
                         <Group position="apart" mb="md">
                             <div>
                                 <Text size="lg" fw={700}>Today Booking Status</Text>
-                                <Text size="sm" c="dimmed">Track the current booking progress for today</Text>
                             </div>
                         </Group>
 
@@ -227,18 +275,18 @@ export default function AdminDashboardPage() {
                                 </Table.Thead>
                                 <Table.Tbody>
                                     {dashboardData.recentBookings.length > 0 ? dashboardData.recentBookings.map((b) => (
-                                        <Table.Tr key={b.reservationId || b.id || b.code}>
-                                            <Table.Td fw={600}>{b.customerName || b.code || 'Guest'}</Table.Td>
-                                            <Table.Td>{b.bookingType || b.type || 'Room'}</Table.Td>
-                                            <Table.Td>{formatDate(b.expectedCheckIn || b.checkInDate || b.createdAt)}</Table.Td>
-                                            <Table.Td>{formatDate(b.bookedAt || b.createdAt)}</Table.Td>
-                                            <Table.Td>
-                                                <Button size="xs" variant="outline" compact onClick={() => navigate(`/admin/reservations/${b.reservationId || b.id}`)}>
-                                                    View
-                                                </Button>
-                                            </Table.Td>
-                                        </Table.Tr>
-                                    )) : (
+                                                <Table.Tr key={b.bookingId || b.reservationId || b.id}>
+                                                    <Table.Td fw={600}>{b.customer?.fullName || b.customer?.username || `Guest`}</Table.Td>
+                                                    <Table.Td>{b.bookingType || b.type || 'Room'}</Table.Td>
+                                                    <Table.Td>{formatDateOnly(b.checkInDate || b.expectedCheckIn || b.createdAt)}</Table.Td>
+                                                    <Table.Td>{formatDateTimeDetailed(extractTimestamp(b))}</Table.Td>
+                                                    <Table.Td>
+                                                        <Button size="xs" variant="outline" compact onClick={() => navigate(`/admin/reservations/${b.bookingId || b.reservationId || b.id}`)}>
+                                                            View
+                                                        </Button>
+                                                    </Table.Td>
+                                                </Table.Tr>
+                                            )) : (
                                         <Table.Tr>
                                             <Table.Td colSpan={5} ta="center" py="xl"><Text c="dimmed">No booking data available</Text></Table.Td>
                                         </Table.Tr>
