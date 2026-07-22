@@ -74,11 +74,19 @@ export default function AdminDashboardPage() {
     const readyRatio = statsData?.totalRooms ? ((statsData.readyRooms ?? 0) / statsData.totalRooms) * 100 : 0;
     const bookedRatio = statsData?.totalRooms ? ((statsData.bookedRooms ?? 0) / statsData.totalRooms) * 100 : 0;
 
-    const roomTypes = [
-        { label: 'Deluxe Room', value: statsData?.deluxeRooms ?? 0, color: 'blue' },
-        { label: 'Family Room', value: statsData?.familyRooms ?? 0, color: 'green' },
-        { label: 'Standard Room', value: statsData?.standardRooms ?? 0, color: 'teal' },
-    ];
+    const colorPalette = ['blue', 'green', 'teal', 'orange', 'violet', 'red', 'cyan', 'grape'];
+
+    const roomTypes = statsData?.roomTypeCounts
+        ? Object.entries(statsData.roomTypeCounts).map(([label, value], index) => ({
+            label,
+            value,
+            color: colorPalette[index % colorPalette.length],
+        }))
+        : [
+            { label: 'Deluxe Room', value: 0, color: 'blue' },
+            { label: 'Family Room', value: 0, color: 'green' },
+            { label: 'Standard Room', value: 0, color: 'teal' },
+        ];
 
     const roomTypeTotal = roomTypes.reduce((sum, roomType) => sum + roomType.value, 0);
     const pieCircumference = 2 * Math.PI * 16;
